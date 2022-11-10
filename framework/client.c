@@ -61,30 +61,24 @@ static int client_process_command(struct client_state *state) {
   char *line = NULL;
   size_t len = 0;
   ssize_t msgsize;
-  
 
   while((msgsize = getline(&line, &len, stdin)) != -1){
-    
     if(line[0] != ' '){
-      printf("%s", line);
-    } else if (line[1] == '@'){
-      printf("privatemsgcommand\n");
-    } else {
-      char* token = strtok(line, " ");
-      if(strcmp(token, "/register") == 0){
-        printf("registration succeeded\n");
-      } else if(strcmp(token, "/users\n") == 0){
-        printf("no users atm\n");
-      } else if(strcmp(token, "/exit\n") == 0){
-        exit(0);
-      } else if(strcmp(token, "/login") == 0){
-        printf("login succeeded\n");
-      } else {
-        printf("unknown command\n");
-      }
+      printf("command invalid: missing whitespace");
+      exit(-1);
     }
+
+    line++;
+    msgsize--;
+     
+    struct ui_state state;
+    ui_state_init(&state);
+
+    ui_state_fill(line, msgsize, &state);
+
+    free(line);
   }
-  free(line);
+
   state->eof = 1;
   return -1;
 }
