@@ -5,16 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "types.h"
 #include "api.h"
 #include "ui.h"
 #include "util.h"
-
-struct client_state {
-  struct api_state api;
-  int eof;
-  struct ui_state ui;
-  /* TODO client state variables go here */
-};
 
 /**
  * @brief Connects to @hostname on port @port and returns the
@@ -51,36 +45,38 @@ static int client_connect(struct client_state *state,
 }
 
 static int client_process_command(struct client_state *state) {
-
   assert(state);
 
-  /* TODO read and handle user command from stdin;
-   * set state->eof if there is no more input (read returns zero)
-   */
   setvbuf(stdout, NULL, _IONBF, 0);
   char *line = NULL;
   size_t len = 0;
-  ssize_t msgsize;
 
-  while((msgsize = getline(&line, &len, stdin)) != -1){
-    if(line[0] != ' '){
-      printf("command invalid: missing whitespace");
-      exit(-1);
-    }
-
-    line++;
-    msgsize--;
-     
-    struct ui_state state;
-    ui_state_init(&state);
-
-    ui_state_fill(line, msgsize, &state);
-
-    free(line);
+  if (getline(&line, &len, stdin) == -1){
+    state->eof = 1;
+    return -1;
   }
 
-  state->eof = 1;
-  return -1;
+  if(line[0] != ' '){
+    printf("command invalid: missing whitespace\n");
+    free(line);
+    return 0;
+  }
+
+  ui_state_init(&state->ui);
+
+  // fill ui state with appropriate information from line (without first space)
+  ui_state_fill(line + 1, &state->ui);
+
+  printf("command: %s\nmsgsize: %li\n\n", state->ui.command, state->ui.msg_size);
+
+  struct api_msg request;
+  ui_state_parse(&state->ui, &request);
+
+  printf("command: %i\nmsgsize: %li\n\n", request.command, request.msg_size);
+
+  free(line);
+
+  return 0;  
 }
 
 /**
@@ -88,9 +84,7 @@ static int client_process_command(struct client_state *state) {
  * @param state   Initialized client state
  * @param msg     Message to handle
  */
-static int execute_request(
-  struct client_state *state,
-  const struct api_msg *msg) {
+static int execute_request(struct client_state *state, const struct api_msg *msg) {
 
   /* TODO handle request and reply to client */
 
