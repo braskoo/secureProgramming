@@ -13,6 +13,8 @@
 
 #include "util.h"
 #include "worker.h"
+// TODO FIX THIS?!?!?!?
+#include "map.h"
 
 #define MAX_CHILDREN 16
 
@@ -23,6 +25,7 @@ struct server_child_state {
 
 struct server_state {
   int sockfd;
+  struct map users;
   struct server_child_state children[MAX_CHILDREN];
   int child_count;
 };
@@ -162,7 +165,7 @@ static int handle_connection(struct server_state *state) {
     /* worker process */
     close(sockets[0]);
     close_server_handles(state);
-    worker_start(connfd, sockets[1]);
+    worker_start(connfd, sockets[1], state->child_count - 1);
     /* never reached */
     exit(1);
   }

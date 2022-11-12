@@ -8,12 +8,14 @@
 #include "api.h"
 #include "util.h"
 #include "worker.h"
+#include "map.h"
 
 struct worker_state {
   struct api_state api;
   int eof;
   int server_fd;  /* server <-> worker bidirectional notification channel */
   int server_eof;
+  int worker_idx;
   /* TODO worker state variables go here */
 };
 
@@ -61,7 +63,7 @@ static int execute_request(
 
   //TODO handle different requests
 
-  send(state->api.fd, "0RECIEVED\n", 10, 0);
+  send(state->api.fd, "0RECIEVED", 10, 0);
 
   return 0;
 }
@@ -178,7 +180,8 @@ static int handle_incoming(struct worker_state *state) {
 static int worker_state_init(
   struct worker_state *state,
   int connfd,
-  int server_fd) {
+  int server_fd,
+  int worker_idx) {
 
   /* initialize */
   memset(state, 0, sizeof(*state));
@@ -221,12 +224,13 @@ static void worker_state_free(
 __attribute__((noreturn))
 void worker_start(
   int connfd,
-  int server_fd) {
+  int server_fd, 
+  int worker_idx) {
   struct worker_state state;
   int success = 1;
 
   /* initialize worker state */
-  if (worker_state_init(&state, connfd, server_fd) != 0) {
+  if (worker_state_init(&state, connfd, server_fd, worker_idx) != 0) {
     goto cleanup;
   }
   /* TODO any additional worker initialization */

@@ -43,8 +43,7 @@ void ui_state_fill(char *line, struct ui_state *state){
   state->msg = msg;
 
   // we check if strchr returned NULL
-  if(msg - 1) state->msg_size = strlen(msg);
-  else state->msg_size = 0;
+  state->msg_size = (msg - 1) ? strlen(msg) : 0;
 }
 
 void ui_state_parse(struct ui_state *state, struct api_msg *buf){
@@ -57,9 +56,9 @@ void ui_state_parse(struct ui_state *state, struct api_msg *buf){
     }
     else if(strcmp(state->command, "/exit\n") == 0) exit(0);
     else if(strcmp(state->command, "/register") == 0) buf->command = C_REGISTER;
-    else if(strcmp(state->command, "/users\n") == 0) buf->command = C_USERS;
     else if(strcmp(state->command, "/login") == 0) buf->command = C_LOGIN;
+    else if(strcmp(state->command, "/users\n") == 0) buf->command = C_USERS;
   
     buf->msg = state->msg;
-    buf->msg_size = strlen(state->msg);
+    buf->msg_size = state->msg_size ? strlen(state->msg) : 0; 
 }
