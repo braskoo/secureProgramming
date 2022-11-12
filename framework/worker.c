@@ -62,8 +62,24 @@ static int execute_request(
   printf("worker recieved: %i | %s\n", msg->command, msg->msg);
 
   //TODO handle different requests
-
-  send(state->api.fd, "0RECIEVED", 10, 0);
+  switch (msg->command) {
+    case C_PRIVMSG:
+      send(state->api.fd, msg->msg, msg->msg_size, 0);
+      break;
+    case C_PUBMSG:
+      send(state->api.fd, msg->msg, msg->msg_size, 0);
+      break;
+    case C_REGISTER:
+      send(state->api.fd, "0YOU CANT REGISTER YET", 23, 0);
+      break;
+    case C_USERS:
+      send(state->api.fd, "0THERE ARE NO USERS YET", 24, 0);
+      break;
+    default: 
+      send(state->api.fd, "0YOU CANT LOGIN YET", 20, 0);
+      break;
+  }
+  
 
   return 0;
 }
