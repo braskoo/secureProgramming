@@ -17,7 +17,7 @@ struct map
 
 void map_delete(struct map *map, int idx);
 void map_init(struct map* map);
-void map_set(struct map *map, struct user user, int idx)
+void map_set(struct map *map, struct user user, int idx);
 void map_getusers(struct map *map, char *buf);
 int map_getfd(struct map *map, char *username);
 
