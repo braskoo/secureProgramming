@@ -71,8 +71,18 @@ static int client_process_command(struct client_state *state) {
 
   struct api_msg request;
   ui_state_parse(&state->ui, &request);
-
+  
   printf("command: %i\nmsgsize: %li\n\n", request.command, request.msg_size);
+
+  ssize_t sent = api_send(&state->api, &request);
+
+  printf("client sent\n");
+
+  if(sent == -1){
+    perror("socket closed");
+    printf("hihi ur socket sucks\n");
+    exit(-1);
+  }
 
   free(line);
 
@@ -85,10 +95,9 @@ static int client_process_command(struct client_state *state) {
  * @param msg     Message to handle
  */
 static int execute_request(struct client_state *state, const struct api_msg *msg) {
+  printf("client recieved: %i | %s\n", msg->command, msg->msg);
 
-  /* TODO handle request and reply to client */
-
-  return -1;
+  return 0;
 }
 
 /**
@@ -152,12 +161,15 @@ static int handle_incoming(struct client_state *state) {
 
   /* handle ready file descriptors */
   if (FD_ISSET(STDIN_FILENO, &readfds)) {
+    printf("client sending\n");
     return client_process_command(state);
+    
   }
   /* TODO once you implement encryption you may need to call ssl_has_data
    * here due to buffering (see ssl-nonblock example)
    */
   if (FD_ISSET(state->api.fd, &readfds)) {
+    printf("client recieving\n");
     return handle_server_request(state);
   }
   return 0;

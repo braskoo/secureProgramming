@@ -57,9 +57,13 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-  /* TODO handle request and reply to client */
+  printf("worker recieved: %i | %s\n", msg->command, msg->msg);
 
-  return -1;
+  //TODO handle different requests
+
+  send(state->api.fd, "0RECIEVED\n", 10, 0);
+
+  return 0;
 }
 
 /**
@@ -70,6 +74,8 @@ static int handle_client_request(struct worker_state *state) {
   struct api_msg msg;
   int r, success = 1;
 
+  printf("worker recieving data\n");
+
   assert(state);
 
   /* wait for incoming request, set eof if there are no more requests */
@@ -79,6 +85,8 @@ static int handle_client_request(struct worker_state *state) {
     state->eof = 1;
     return 0;
   }
+
+  printf("worker recieved valid amount of data\n");
 
   /* execute request */
   if (execute_request(state, &msg) != 0) {

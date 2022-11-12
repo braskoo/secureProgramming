@@ -1,5 +1,9 @@
 #include <assert.h>
 #include <string.h>
+#include <stdint.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "api.h"
 
@@ -11,13 +15,18 @@
  *                or -1 in case of error.
  */
 int api_recv(struct api_state *state, struct api_msg *msg) {
-
   assert(state);
   assert(msg);
 
-  /* TODO receive a message and store information in *msg */
+  char *buf = malloc(1024);
 
-  return -1;
+  ssize_t recieved = recv(state->fd, buf, 1024, 0);
+
+  msg->command = buf[0];
+  msg->msg = buf + 1;
+  msg->msg_size = recieved - 1;
+
+  return recieved;
 }
 
 /**
@@ -58,4 +67,14 @@ void api_state_init(struct api_state *state, int fd) {
   state->fd = fd;
 
   /* TODO initialize API state */
+}
+
+ssize_t api_send(struct api_state *api, struct api_msg *request){
+  char* buf = malloc(1 + request->msg_size);
+  buf[0] = (char)request->command; 
+  memcpy(buf + 1, request->msg, request->msg_size);
+
+  ssize_t sent = send(api->fd, buf, request->msg_size + 1, MSG_DONTWAIT);
+
+  return sent;
 }

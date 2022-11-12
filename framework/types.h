@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 enum COMMANDS{
-  C_PRIVMSG, 
+  C_PRIVMSG = (char)0, 
   C_PUBMSG,
   C_REGISTER,
   C_USERS,
