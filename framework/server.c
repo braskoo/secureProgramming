@@ -13,7 +13,6 @@
 
 #include "util.h"
 #include "worker.h"
-// TODO FIX THIS?!?!?!?
 #include "map.h"
 
 #define MAX_CHILDREN 16
