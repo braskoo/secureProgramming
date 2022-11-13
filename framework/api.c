@@ -18,7 +18,7 @@ int api_recv(struct api_state *state, struct api_msg *msg) {
   assert(state);
   assert(msg);
 
-  char *buf = malloc(1024);
+  char *buf = calloc(1, 1024);
 
   ssize_t recieved = recv(state->fd, buf, 1024, 0);
 

@@ -95,7 +95,7 @@ static int client_process_command(struct client_state *state) {
  * @param msg     Message to handle
  */
 static int execute_request(struct client_state *state, const struct api_msg *msg) {
-  printf("client recieved: %i | %s\n", msg->command, msg->msg);
+  printf("client recieved %s", msg->msg);
 
   return 0;
 }

@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <string.h>
 
+#define MAX_CHILDREN 16
+
 struct user {
     char *username;
     int fd;
@@ -20,5 +22,6 @@ void map_init(struct map* map);
 void map_set(struct map *map, struct user user, int idx);
 void map_getusers(struct map *map, char *buf);
 int map_getfd(struct map *map, char *username);
+void map_getfds_all(struct map *map, int *buf);
 
 #endif

@@ -9,6 +9,7 @@
 #include "util.h"
 #include "worker.h"
 #include "map.h"
+#include "workerutil.h"
 
 struct worker_state {
   struct api_state api;
@@ -16,6 +17,7 @@ struct worker_state {
   int server_fd;  /* server <-> worker bidirectional notification channel */
   int server_eof;
   int worker_idx;
+  struct map *users;
   /* TODO worker state variables go here */
 };
 
@@ -63,18 +65,47 @@ static int execute_request(
 
   //TODO handle different requests
   switch (msg->command) {
-    case C_PRIVMSG:
-      send(state->api.fd, msg->msg, msg->msg_size, 0);
+    case C_PRIVMSG: {
+      struct string_pair buf;
+      worker_split_string(msg->msg, &buf);
+      int target_fd = map_getfd(state->users, buf.first + 1);
+
+      if(target_fd >= 0){
+        send(target_fd, msg->msg, msg->msg_size, 0);
+      }
       break;
-    case C_PUBMSG:
-      send(state->api.fd, msg->msg, msg->msg_size, 0);
+    }
+    case C_PUBMSG: {
+      int *fd_all = malloc(MAX_CHILDREN * sizeof(int));
+      map_getfds_all(state->users, fd_all);
+
+      for(int i = 0; i < MAX_CHILDREN; i++){
+        if(fd_all[i] >= 0){
+          send(fd_all[i], msg->msg, msg->msg_size, 0);
+        }
+      }
       break;
-    case C_REGISTER:
-      send(state->api.fd, "0YOU CANT REGISTER YET", 23, 0);
+    }
+    case C_REGISTER: {
+      printf("processing register?\n");
+      struct user new_user;
+      struct string_pair buf;
+      printf("string split?\n");
+      worker_split_string(msg->msg, &buf);
+      printf("string split!\n");
+      new_user.username = buf.first;
+      new_user.fd = state->api.fd;
+
+      printf("setting map\n");
+      map_set(state->users, new_user, state->worker_idx);
+      printf("fd %i registered with name (%s)", new_user.fd, new_user.username);
+      send(state->api.fd, "REGISTERED", 11, 0);
       break;
-    case C_USERS:
+    }
+    case C_USERS: {
       send(state->api.fd, "0THERE ARE NO USERS YET", 24, 0);
       break;
+    }
     default: 
       send(state->api.fd, "0YOU CANT LOGIN YET", 20, 0);
       break;
@@ -197,7 +228,8 @@ static int worker_state_init(
   struct worker_state *state,
   int connfd,
   int server_fd,
-  int worker_idx) {
+  int worker_idx, 
+  struct map *users) {
 
   /* initialize */
   memset(state, 0, sizeof(*state));
@@ -206,7 +238,7 @@ static int worker_state_init(
   /* set up API state */
   api_state_init(&state->api, connfd);
 
-  /* TODO any additional worker state initialization */
+  state->users = users;
 
   return 0;
 }
@@ -241,12 +273,13 @@ __attribute__((noreturn))
 void worker_start(
   int connfd,
   int server_fd, 
-  int worker_idx) {
+  int worker_idx, 
+  struct map *users) {
   struct worker_state state;
   int success = 1;
 
   /* initialize worker state */
-  if (worker_state_init(&state, connfd, server_fd, worker_idx) != 0) {
+  if (worker_state_init(&state, connfd, server_fd, worker_idx, users) != 0) {
     goto cleanup;
   }
   /* TODO any additional worker initialization */

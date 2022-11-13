@@ -18,11 +18,15 @@ server.o: server.c util.h
 
 util.o: util.c util.h
 
-worker.o: worker.c util.h worker.h
+map.o: map.c map.h
+
+workerutil.o: workerutil.c workerutil.h
+
+worker.o: worker.c util.h worker.h 
 
 client: client.o api.o ui.o util.o
 
-server: server.o api.o util.o worker.o
+server: server.o api.o util.o worker.o map.o workerutil.o
 
 
 
