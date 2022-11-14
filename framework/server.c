@@ -162,7 +162,7 @@ static int handle_connection(struct server_state *state) {
     /* worker process */
     close(sockets[0]);
     close_server_handles(state);
-    worker_start(connfd, sockets[1], state->child_count - 1, state->users);
+    worker_start(connfd, sockets[1], state->child_count, state->users);
     /* never reached */
     exit(1);
   }
