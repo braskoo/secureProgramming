@@ -1,0 +1,13 @@
+CREATE TABLE [Users] ( 
+	[UserName] INTEGER  NOT NULL PRIMARY KEY, 
+	[Password] NVARCHAR(50)  NOT NULL  
+); 
+
+CREATE TABLE [Messages] (  
+    FOREIGN KEY ([Sender]) REFERENCES "Users" ([UserName])
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+    FOREIGN KEY ([Receiver]) REFERENCES "Users" ([UserName])
+                ON DELETE NO ACTION ON UPDATE NO ACTION
+	[Time] DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,   
+	[Message] NVARCHAR(1024) 
+);     

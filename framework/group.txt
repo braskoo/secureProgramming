@@ -1,0 +1,3 @@
+studentID | vunetid | Klaas de Jong | addemail
+studentID | vunetid | Fatih Yakici | addemail
+2665178 | eba215 | Elisa Bermejo Casla | e.bermejocasla@student.vu.nl
