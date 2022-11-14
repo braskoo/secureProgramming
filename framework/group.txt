@@ -1,3 +1,5 @@
-studentID | vunetid | Klaas de Jong | addemail
-studentID | vunetid | Fatih Yakici | addemail
+2693863 | kjg510 | Klaas de Jong | k.j2.de.jong@student.vu.nl
+2672343 | fyi260 | Fatih Yakici | f.yakici@student.vu.nl
 2665178 | eba215 | Elisa Bermejo Casla | e.bermejocasla@student.vu.nl
+
+    

@@ -1,6 +1,6 @@
 CREATE TABLE [Users] ( 
 	[UserName] INTEGER  NOT NULL PRIMARY KEY, 
-	[Password] NVARCHAR(50)  NOT NULL  
+	[Password] NVARCHAR(50)  
 ); 
 
 CREATE TABLE [Messages] (  
@@ -9,5 +9,5 @@ CREATE TABLE [Messages] (
     FOREIGN KEY ([Receiver]) REFERENCES "Users" ([UserName])
                 ON DELETE NO ACTION ON UPDATE NO ACTION
 	[Time] DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,   
-	[Message] NVARCHAR(1024) 
+	[Message] NVARCHAR(1024) NOT NULL 
 );     
