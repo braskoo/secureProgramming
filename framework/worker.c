@@ -58,7 +58,7 @@ static int handle_s2w_notification(struct worker_state *state) {
     perror("error: cannot write to client");
     return -1;
   }
-  
+  free(msg);
   sqlite3_finalize(stmt);
   return 0;
 }
@@ -120,17 +120,6 @@ static int execute_request(
       if(target_fd >= 0){
         send(target_fd, msg->msg, msg->msg_size, 0);
       }
-
-      // char *sql_insert = (char*)malloc(1200 * sizeof(char));
-
-
-      // sender fd not defined, should it be part of api_message?
-      // sprintf(sql_insert, "INSERT INTO (Messages) VALUES(\'%d\', \'%d\', DEFAULT, \'%s\');",sender_fd, target_fd, msg->msg);
-
-      //Missing error handling for exec
-      // sqlite3_exec(state->api->db, sql_insert, 0, 0, &err_msg);
-      
-
       break;
     }
     case C_PUBMSG: {
@@ -143,9 +132,7 @@ static int execute_request(
       //   }
       // }
       char *sql_insert = (char*)malloc(1200 * sizeof(char));
-
-      // sender_fd needed
-      // using all as receiver field to mark a public message, we can change this later 
+      // using 0 as receiver field to mark a public message, we can change this later 
 
       sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'-1\', \'%s\')", state->worker_idx, msg->msg);
       
@@ -161,6 +148,7 @@ static int execute_request(
         
         return 1;
       } 
+      free(sql_insert);
       notify_workers(state);
       // char *sql = "SELECT * FROM Messages";
       // printf("your insert succeed\n");

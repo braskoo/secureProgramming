@@ -1,7 +1,0 @@
-CREATE TABLE [Messages] (  
-    [Sender] INTEGER  NOT NULL, 
-    [Receiver] INTEGER NOT NULL,
-	[Time] DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,   
-	[Message] NVARCHAR(1024) NOT NULL
-    CONSTRAINT MessageKey PRIMARY KEY (Sender, Receiver, Time) 
-);     
