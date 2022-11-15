@@ -67,16 +67,12 @@ static int client_process_command(struct client_state *state) {
   // fill ui state with appropriate information from line (without first space)
   ui_state_fill(line + 1, &state->ui);
 
-  printf("command: %s\nmsgsize: %li\n\n", state->ui.command, state->ui.msg_size);
-
   struct api_msg request;
   ui_state_parse(&state->ui, &request);
   
-  printf("command: %i\nmsgsize: %li\n\n", request.command, request.msg_size);
 
   ssize_t sent = api_send(&state->api, &request);
 
-  printf("client sent\n");
 
   if(sent == -1){
     perror("socket closed");
@@ -95,7 +91,7 @@ static int client_process_command(struct client_state *state) {
  * @param msg     Message to handle
  */
 static int execute_request(struct client_state *state, const struct api_msg *msg) {
-  printf("client recieved %s", msg->msg);
+  printf("%s", msg->msg);
 
   return 0;
 }
@@ -161,7 +157,6 @@ static int handle_incoming(struct client_state *state) {
 
   /* handle ready file descriptors */
   if (FD_ISSET(STDIN_FILENO, &readfds)) {
-    printf("client sending\n");
     return client_process_command(state);
     
   }
@@ -169,7 +164,6 @@ static int handle_incoming(struct client_state *state) {
    * here due to buffering (see ssl-nonblock example)
    */
   if (FD_ISSET(state->api.fd, &readfds)) {
-    printf("client recieving\n");
     return handle_server_request(state);
   }
   return 0;

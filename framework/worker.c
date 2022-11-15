@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sqlite3>
+#include <sqlite3.h>
 
 #include "api.h"
 #include "util.h"
@@ -19,7 +19,7 @@ struct worker_state {
   int server_eof;
   int worker_idx;
   struct map *users;
-  
+  sqlite3 *db;
 
   /* TODO worker state variables go here */
 };
@@ -30,7 +30,37 @@ struct worker_state {
  */
 static int handle_s2w_notification(struct worker_state *state) {
   /* TODO implement the function */
-  return -1;
+ 
+  int sender, length; 
+  const unsigned char *time, *message;
+  char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
+  sqlite3_stmt *stmt;
+
+  int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
+  if (rc != SQLITE_OK ) {
+    printf("error: %s\n", sqlite3_errmsg(state->db));
+    sqlite3_close(state->db);
+    return 1;
+  }
+
+  if(sqlite3_step(stmt) == SQLITE_ROW){
+    length = sqlite3_column_int(stmt, 0);
+    sender = sqlite3_column_int(stmt, 1);
+    time = sqlite3_column_text(stmt, 2);
+    message = sqlite3_column_text(stmt, 3);
+  }
+
+  char* msg = malloc(length);
+  sprintf(msg, "%s %d: %s\n", time, sender, message);
+
+  ssize_t size = send(state->api.fd, msg-1, length+4, 0);
+  if(size < 0){
+    perror("error: cannot write to client");
+    return -1;
+  }
+  
+  sqlite3_finalize(stmt);
+  return 0;
 }
 
 /**
@@ -55,6 +85,19 @@ static int notify_workers(struct worker_state *state) {
   return 0;
 }
 
+int callback(void *NotUsed, int argc, char **argv, 
+                    char **azColName) {
+    
+    NotUsed = 0;
+    
+    for (int i = 0; i < argc; i++) {
+
+        printf("%s\n", argv[i] ? argv[i] : "NULL");
+    }
+    
+    return 0;
+}
+
 /**
  * @brief         Handles a message coming from client
  * @param state   Initialized worker state
@@ -64,7 +107,8 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-  printf("worker recieved: %i | %s\n", msg->command, msg->msg);
+  
+  char *err_msg = 0;
 
   //TODO handle different requests
   switch (msg->command) {
@@ -77,7 +121,7 @@ static int execute_request(
         send(target_fd, msg->msg, msg->msg_size, 0);
       }
 
-      char *sql_insert = (char*)malloc(1200 * sizeof(char));
+      // char *sql_insert = (char*)malloc(1200 * sizeof(char));
 
 
       // sender fd not defined, should it be part of api_message?
@@ -90,25 +134,37 @@ static int execute_request(
       break;
     }
     case C_PUBMSG: {
-      int *fd_all = malloc(MAX_CHILDREN * sizeof(int));
-      map_getfds_all(state->users, fd_all);
+      // int *fd_all = malloc(MAX_CHILDREN * sizeof(int));
+      // map_getfds_all(state->users, fd_all);
 
-      for(int i = 0; i < MAX_CHILDREN; i++){
-        if(fd_all[i] >= 0){
-          send(fd_all[i], msg->msg, msg->msg_size, 0);
-        }
-
+      // for(int i = 0; i < MAX_CHILDREN; i++){
+      //   if(fd_all[i] >= 0){
+      //     send(fd_all[i], msg->msg, msg->msg_size, 0);
+      //   }
+      // }
       char *sql_insert = (char*)malloc(1200 * sizeof(char));
 
       // sender_fd needed
       // using all as receiver field to mark a public message, we can change this later 
 
-      // sprintf(sql_insert, "INSERT INTO (Messages) VALUES(\'%d\', \'all\', DEFAULT, \'%s\');",sender_fd, msg->msg);
-
-      //Missing error handling for exec
-      // sqlite3_exec(state->api->db, sql_insert, 0, 0, &err_msg);
+      sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'-1\', \'%s\')", state->worker_idx, msg->msg);
       
-      }
+      //Missing error handling for exec
+      int rc = sqlite3_exec(state->db, sql_insert, 0, 0, &err_msg);
+      if (rc != SQLITE_OK ) {
+        
+        fprintf(stderr, "Failed to select data\n");
+        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(state->db));
+
+        sqlite3_free(err_msg);
+        sqlite3_close(state->db);
+        
+        return 1;
+      } 
+      notify_workers(state);
+      // char *sql = "SELECT * FROM Messages";
+      // printf("your insert succeed\n");
+      // sqlite3_exec(state->db, sql, callback, 0, &err_msg);
       break;
     }
     case C_REGISTER: {
@@ -148,7 +204,6 @@ static int handle_client_request(struct worker_state *state) {
   struct api_msg msg;
   int r, success = 1;
 
-  printf("worker recieving data\n");
 
   assert(state);
 
@@ -160,7 +215,6 @@ static int handle_client_request(struct worker_state *state) {
     return 0;
   }
 
-  printf("worker recieved valid amount of data\n");
 
   /* execute request */
   if (execute_request(state, &msg) != 0) {
@@ -265,6 +319,17 @@ static int worker_state_init(
 
   state->users = users;
 
+  sqlite3 *db;
+  
+  int rc = sqlite3_open("chat.db", &db);
+
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    
+    return 1;
+  }
+  state->db = db;
   return 0;
 }
 
@@ -283,6 +348,7 @@ static void worker_state_free(
   /* close file descriptors */
   close(state->server_fd);
   close(state->api.fd);
+  sqlite3_close(state->db);
 }
 
 /**

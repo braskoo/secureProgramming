@@ -15,7 +15,6 @@ enum COMMANDS{
 struct api_state {
   int fd;
   /* TODO add required fields */
-  sqlite3 *db;
 };
 
 struct api_msg {

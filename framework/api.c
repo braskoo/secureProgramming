@@ -70,16 +70,6 @@ void api_state_init(struct api_state *state, int fd) {
 
   /* TODO initialize API state */
 
-  
-  int rc = sqlite3_open("database.db", state->db);
-
-  if (rc != SQLITE_OK) {
-        
-        fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-        
-        return 1;
-    }  
 }
 
 ssize_t api_send(struct api_state *api, struct api_msg *request){

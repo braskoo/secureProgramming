@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sqlite3.h>
 
 #include "util.h"
 #include "worker.h"
@@ -271,6 +272,7 @@ static void usage(void) {
 
 static int server_state_init(struct server_state *state) {
   int i;
+  
 
   /* clear state, invalidate file descriptors */
   memset(state, 0, sizeof(*state));
@@ -285,15 +287,8 @@ static int server_state_init(struct server_state *state) {
 
   /* TODO any additional server state initialization */
 
-  int rc = sqlite3_open("database.db", &db);
-
-  if (rc != SQLITE_OK) {
-        
-        fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-        
-        return 1;
-    }    
+  
+  
 
   return 0;
 }
