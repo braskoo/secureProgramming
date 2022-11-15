@@ -44,7 +44,7 @@ static int handle_s2w_notification(struct worker_state *state) {
   }
 
   if(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_int(stmt, 0);
+    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 4;
     sender = sqlite3_column_int(stmt, 1);
     time = sqlite3_column_text(stmt, 2);
     message = sqlite3_column_text(stmt, 3);
@@ -61,6 +61,34 @@ static int handle_s2w_notification(struct worker_state *state) {
   free(msg);
   sqlite3_finalize(stmt);
   return 0;
+}
+
+char* get_chat_history(struct worker_state *state, int *msg_size){
+  int sender, length = 0; 
+  const unsigned char *time, *message;
+  char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages";
+  sqlite3_stmt *stmt;
+
+  int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
+  if (rc != SQLITE_OK ) {
+    printf("error: %s\n", sqlite3_errmsg(state->db));
+    sqlite3_close(state->db);
+    return "error";
+  }
+  char* buf = malloc(10000);
+  
+  while(sqlite3_step(stmt) == SQLITE_ROW){
+    length = length + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 5;
+    sender = sqlite3_column_int(stmt, 1);
+    time = sqlite3_column_text(stmt, 2);
+    message = sqlite3_column_text(stmt, 3);
+    char* msg = malloc(length);
+    sprintf(msg, "%s %d: %s\n", time, sender, message);
+    //buf = realloc(buf, length);
+    strcat(buf, msg);
+  }
+  *msg_size = length;
+  return buf;
 }
 
 /**
@@ -362,8 +390,9 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
-
-
+  int size = 0;
+  char *buf = get_chat_history(&state, &size);
+  send(state.api.fd, buf, size, 0);
   /* handle for incoming requests */
   while (!state.eof) {
     if (handle_incoming(&state) != 0) {
