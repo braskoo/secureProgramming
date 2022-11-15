@@ -183,6 +183,7 @@ static int client_state_init(struct client_state *state) {
   ui_state_init(&state->ui);
 
   /* TODO any additional client state initialization */
+  setvbuf(stdout, NULL, _IONBF, 0);
   
   return 0;
 }

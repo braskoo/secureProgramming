@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sqlite3>
 
 #include "api.h"
 #include "util.h"
@@ -18,6 +19,8 @@ struct worker_state {
   int server_eof;
   int worker_idx;
   struct map *users;
+  
+
   /* TODO worker state variables go here */
 };
 
@@ -73,6 +76,17 @@ static int execute_request(
       if(target_fd >= 0){
         send(target_fd, msg->msg, msg->msg_size, 0);
       }
+
+      char *sql_insert = (char*)malloc(1200 * sizeof(char));
+
+
+      // sender fd not defined, should it be part of api_message?
+      // sprintf(sql_insert, "INSERT INTO (Messages) VALUES(\'%d\', \'%d\', DEFAULT, \'%s\');",sender_fd, target_fd, msg->msg);
+
+      //Missing error handling for exec
+      // sqlite3_exec(state->api->db, sql_insert, 0, 0, &err_msg);
+      
+
       break;
     }
     case C_PUBMSG: {
@@ -83,6 +97,17 @@ static int execute_request(
         if(fd_all[i] >= 0){
           send(fd_all[i], msg->msg, msg->msg_size, 0);
         }
+
+      char *sql_insert = (char*)malloc(1200 * sizeof(char));
+
+      // sender_fd needed
+      // using all as receiver field to mark a public message, we can change this later 
+
+      // sprintf(sql_insert, "INSERT INTO (Messages) VALUES(\'%d\', \'all\', DEFAULT, \'%s\');",sender_fd, msg->msg);
+
+      //Missing error handling for exec
+      // sqlite3_exec(state->api->db, sql_insert, 0, 0, &err_msg);
+      
       }
       break;
     }
@@ -283,6 +308,7 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
+
 
   /* handle for incoming requests */
   while (!state.eof) {

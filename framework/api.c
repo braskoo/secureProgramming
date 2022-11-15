@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sqlite3.h>
 
 #include "api.h"
 
@@ -38,6 +39,7 @@ void api_recv_free(struct api_msg *msg) {
   assert(msg);
 
   /* TODO clean up state allocated for msg */
+
 }
 
 /**
@@ -67,6 +69,17 @@ void api_state_init(struct api_state *state, int fd) {
   state->fd = fd;
 
   /* TODO initialize API state */
+
+  
+  int rc = sqlite3_open("database.db", state->db);
+
+  if (rc != SQLITE_OK) {
+        
+        fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        
+        return 1;
+    }  
 }
 
 ssize_t api_send(struct api_state *api, struct api_msg *request){

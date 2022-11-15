@@ -2,6 +2,7 @@
 #define _TYPES_H_
 
 #include <unistd.h>
+#include <sqlite3.h>
 
 enum COMMANDS{
   C_PRIVMSG, 
@@ -14,6 +15,7 @@ enum COMMANDS{
 struct api_state {
   int fd;
   /* TODO add required fields */
+  sqlite3 *db;
 };
 
 struct api_msg {
