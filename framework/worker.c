@@ -33,7 +33,7 @@ static int handle_s2w_notification(struct worker_state *state) {
  
   int length = 0; 
   const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
+  char *select_last = "SELECT Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
   sqlite3_stmt *stmt;
 
   int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
@@ -44,10 +44,10 @@ static int handle_s2w_notification(struct worker_state *state) {
   }
 
   if(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 3;
-    sender = sqlite3_column_text(stmt, 1);
-    time = sqlite3_column_text(stmt, 2);
-    message = sqlite3_column_text(stmt, 3);
+    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + 3;
+    sender = sqlite3_column_text(stmt, 0);
+    time = sqlite3_column_text(stmt, 1);
+    message = sqlite3_column_text(stmt, 2);
   }
 
   char* msg = malloc(length+7);
@@ -66,7 +66,7 @@ static int handle_s2w_notification(struct worker_state *state) {
 void get_chat_history(struct worker_state *state){
   int length = 0; 
   const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages";
+  char *select_last = "SELECT Sender, Time, Message FROM Messages";
   sqlite3_stmt *stmt;
 
   int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
@@ -78,14 +78,14 @@ void get_chat_history(struct worker_state *state){
   char* msg = malloc(0);
   
   while(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3)+3;
-    sender = sqlite3_column_text(stmt, 1);
-    time = sqlite3_column_text(stmt, 2);
-    message = sqlite3_column_text(stmt, 3);
+    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2)+3;
+    sender = sqlite3_column_text(stmt, 0);
+    time = sqlite3_column_text(stmt, 1);
+    message = sqlite3_column_text(stmt, 2);
     msg = realloc(msg, length+7);
     int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
     printf("%d\n", msg_size);
-    
+
     ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
     sleep(0.1);
     if(sent < 0){
