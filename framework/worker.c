@@ -31,8 +31,8 @@ struct worker_state {
 static int handle_s2w_notification(struct worker_state *state) {
   /* TODO implement the function */
  
-  int sender, length; 
-  const unsigned char *time, *message;
+  int length = 0; 
+  const unsigned char *time, *message, *sender;
   char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
   sqlite3_stmt *stmt;
 
@@ -44,17 +44,17 @@ static int handle_s2w_notification(struct worker_state *state) {
   }
 
   if(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 4;
-    sender = sqlite3_column_int(stmt, 1);
+    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 3;
+    sender = sqlite3_column_text(stmt, 1);
     time = sqlite3_column_text(stmt, 2);
     message = sqlite3_column_text(stmt, 3);
   }
 
-  char* msg = malloc(length);
-  sprintf(msg, "%s %d: %s\n", time, sender, message);
+  char* msg = malloc(length+7);
+  int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
 
-  ssize_t size = send(state->api.fd, msg-1, length+4, 0);
-  if(size < 0){
+  ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
+  if(sent < 0){
     perror("error: cannot write to client");
     return -1;
   }
@@ -63,9 +63,9 @@ static int handle_s2w_notification(struct worker_state *state) {
   return 0;
 }
 
-char* get_chat_history(struct worker_state *state, int *msg_size){
-  int sender, length = 0; 
-  const unsigned char *time, *message;
+void get_chat_history(struct worker_state *state){
+  int length = 0; 
+  const unsigned char *time, *message, *sender;
   char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages";
   sqlite3_stmt *stmt;
 
@@ -73,22 +73,29 @@ char* get_chat_history(struct worker_state *state, int *msg_size){
   if (rc != SQLITE_OK ) {
     printf("error: %s\n", sqlite3_errmsg(state->db));
     sqlite3_close(state->db);
-    return "error";
+    return;
   }
-  char* buf = malloc(10000);
+  char* msg = malloc(0);
   
   while(sqlite3_step(stmt) == SQLITE_ROW){
-    length = length + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3) + 5;
-    sender = sqlite3_column_int(stmt, 1);
+    length = sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt, 3)+3;
+    sender = sqlite3_column_text(stmt, 1);
     time = sqlite3_column_text(stmt, 2);
     message = sqlite3_column_text(stmt, 3);
-    char* msg = malloc(length);
-    sprintf(msg, "%s %d: %s\n", time, sender, message);
-    //buf = realloc(buf, length);
-    strcat(buf, msg);
+    msg = realloc(msg, length+7);
+    int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
+    printf("%d\n", msg_size);
+    
+    ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
+    sleep(0.1);
+    if(sent < 0){
+      perror("error: cannot write to client");
+      return;
+    }
   }
-  *msg_size = length;
-  return buf;
+  free(msg);
+  sqlite3_finalize(stmt);
+  
 }
 
 /**
@@ -390,10 +397,8 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
-  int size = 0;
-  char *buf = get_chat_history(&state, &size);
-  send(state.api.fd, buf, size, 0);
-  /* handle for incoming requests */
+  get_chat_history(&state);
+
   while (!state.eof) {
     if (handle_incoming(&state) != 0) {
       success = 0;
