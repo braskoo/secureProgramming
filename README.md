@@ -1,5 +1,5 @@
 # secureProgramming
-Private message
+Private message\n
 The message should be encrypted by using a hash function (probably SHA-256?), the sender should be able to proof that they are legit with their key.
 
 Public message
