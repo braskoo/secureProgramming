@@ -1,14 +1,14 @@
 # secureProgramming
-Private message\n
+Private message:
 The message should be encrypted by using a hash function (probably SHA-256?), the sender should be able to proof that they are legit with their key.
 
-Public message
+Public message:
 The message should also be encrypted by using a hash function (probably SHA-256?), so that mallory can not leak any data of the chat. The sender should be able to proof they are legit with their key.
 
-Register command
+Register command:
 The username and password both should be encrypted by using a hash function (probably SHA-256?).
 
-Login command
+Login command:
 The username and password both should be encrypted by using a hash function (probably SHA-256?).
 
 Key distribution:
