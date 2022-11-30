@@ -140,9 +140,8 @@ static int execute_request(
     }
     case C_REGISTER: {
       printf("processing register?\n");
-      struct string_pair buf;
 
-      worker_split_string(msg->msg, &buf);
+      worker_split_string(msg->msg);
 
       // TODO handle register
       break;

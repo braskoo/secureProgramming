@@ -4,11 +4,8 @@
 
 #include "workerutil.h"
 
-void worker_split_string(char *line, struct string_pair *buf){
+void worker_split_string(const char line[]){
     char *split_idx = strchr(line, ' ');
-    *split_idx = '\0';
-    buf->first = line;
-    buf->second = split_idx + 1;
 
-    printf("split | first: (%s), second: (%s)\n", buf->first, buf->second);
+    printf("split | first: (%s), second: (%s)\n", line, split_idx + 1);
 }
