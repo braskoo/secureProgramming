@@ -10,6 +10,7 @@
 #include "util.h"
 #include "worker.h"
 #include "workerutil.h"
+#include "db.h"
 
 struct worker_state {
   struct api_state api;
@@ -34,11 +35,8 @@ static int handle_s2w_notification(struct worker_state *state) {
   char *select_last = "SELECT Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
   sqlite3_stmt *stmt;
 
-  int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
-  if (rc != SQLITE_OK ) {
-    printf("error: %s\n", sqlite3_errmsg(state->db));
-    sqlite3_close(state->db);
-    return 1;
+  if(prepare_db(state->db, select_last, &stmt) < 0) {
+    return -1;
   }
 
   if(sqlite3_step(stmt) == SQLITE_ROW){
@@ -67,11 +65,8 @@ void get_chat_history(struct worker_state *state){
   char *select_last = "SELECT Sender, Time, Message FROM Messages";
   sqlite3_stmt *stmt;
 
-  int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
-  if (rc != SQLITE_OK ) {
-    printf("error: %s\n", sqlite3_errmsg(state->db));
-    sqlite3_close(state->db);
-    return;
+  if(prepare_db(state->db, select_last, &stmt) < 0) {
+    return -1;
   }
   char* msg = malloc(0);
   
@@ -176,8 +171,9 @@ static int execute_request(
     }
     case C_REGISTER: {
       printf("processing register?\n");
+      struct string_pair buf;
 
-      worker_split_string(msg->msg);
+      worker_split_string(msg->msg, &buf);
 
       // TODO handle register
       break;
