@@ -61,13 +61,16 @@ static int client_process_command(struct client_state *state) {
   // fill ui state with appropriate information from line
   ui_state_fill(line, &state->ui);
 
-  struct api_msg request;
-  if(ui_state_parse(&state->ui, &request) == -1){
+  struct api_msg *request = ui_state_parse(&state->ui);
+  api_debug_msg(request, "CLIENT");
+
+  if(request->command == C_INVALID){
     printf("invalid command, please try again\n");
+    free(request);
     goto cleanup;
   }
 
-  ssize_t sent = api_send(&state->api, &request);
+  ssize_t sent = api_send(&state->api, request);
 
   if(sent == -1){
     perror("socket closed");
@@ -78,7 +81,7 @@ static int client_process_command(struct client_state *state) {
   cleanup:
   free(line);
 
-  return 0;  
+  return 0; 
 }
 
 /**
@@ -97,13 +100,13 @@ static int execute_request(struct client_state *state, const struct api_msg *msg
  * @param state   Initialized client state
  */
 static int handle_server_request(struct client_state *state) {
-  struct api_msg msg;
   int r, success = 1;
 
   assert(state);
 
+  struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
-  r = api_recv(&state->api, &msg);
+  r = msg->command;
   if (r < 0) return -1;
   if (r == 0) {
     state->eof = 1;
@@ -111,12 +114,12 @@ static int handle_server_request(struct client_state *state) {
   }
 
   /* execute request */
-  if (execute_request(state, &msg) != 0) {
+  if (execute_request(state, msg) != 0) {
     success = 0;
   }
 
   /* clean up state associated with the message */
-  api_recv_free(&msg);
+  api_recv_free(msg);
 
   return success ? 0 : -1;
 }

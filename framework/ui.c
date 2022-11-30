@@ -53,22 +53,26 @@ void ui_state_fill(char *line, struct ui_state *state){
   state->msg_size = (msg - 1) ? strlen(msg) : 0;
 }
 
-int ui_state_parse(struct ui_state *state, struct api_msg *buf){
-    assert(buf);
+// allocates and fills a new api message in heap memory
+struct api_msg *ui_state_parse(struct ui_state *state){
+    printf("ui state: %s|%li|%s\n", state->command, state->msg_size, state->msg);
+    struct api_msg* ptr = malloc(state->msg_size + sizeof(struct api_msg));
 
     // parse command type
     if(!state->command){ 
-      if(state->msg[0] == '@') buf->command = C_PRIVMSG;
-      else buf->command = C_PUBMSG;
+      if(state->msg[0] == '@') ptr->command = C_PRIVMSG;
+      else ptr->command = C_PUBMSG;
     }
     else if(strcmp(state->command, "/exit\n") == 0) exit(0);
-    else if(strcmp(state->command, "/register") == 0) buf->command = C_REGISTER;
-    else if(strcmp(state->command, "/login") == 0) buf->command = C_LOGIN;
-    else if(strcmp(state->command, "/users\n") == 0) buf->command = C_USERS;
-    else return -1;
+    else if(strcmp(state->command, "/register") == 0) ptr->command = C_REGISTER;
+    else if(strcmp(state->command, "/login") == 0) ptr->command = C_LOGIN;
+    else if(strcmp(state->command, "/users\n") == 0) ptr->command = C_USERS;
+    else ptr->command = C_INVALID;
     
-    strncpy(buf->msg, state->msg, state->msg_size);
-    buf->msg_size = state->msg_size ? strlen(state->msg) : 0; 
+    if(ptr->command != C_INVALID && state->msg_size > 0){
+      strncpy(ptr->msg, state->msg, state->msg_size);
+      ptr->msg_size = state->msg_size;
+    } else ptr->msg_size = 0;
 
-    return 0;
+    return ptr;
 }

@@ -22,6 +22,15 @@ struct worker_state {
   /* TODO worker state variables go here */
 };
 
+void send_ack(struct api_state state){
+  struct api_msg *msg = malloc(sizeof(struct api_msg) + sizeof("ACK"));
+  msg->msg_size = sizeof("ACK");
+  msg->command = C_ACK;
+  strncpy(msg->msg, "ACK", msg->msg_size);
+
+  api_send(&state, msg);
+}
+
 /**
  * @brief Reads an incoming notification from the server and notifies
  *        the client.
@@ -136,6 +145,7 @@ static int execute_request(
       // char *sql = "SELECT * FROM Messages";
       // printf("your insert succeed\n");
       // sqlite3_exec(state->db, sql, callback, 0, &err_msg);
+      send_ack(state->api);
       break;
     }
     case C_REGISTER: {
@@ -164,28 +174,25 @@ static int execute_request(
  * @param state   Initialized worker state
  */
 static int handle_client_request(struct worker_state *state) {
-  struct api_msg msg;
   int r, success = 1;
-
-
   assert(state);
 
+  struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
-  r = api_recv(&state->api, &msg);
+  r = msg->command;
   if (r < 0) return -1;
   if (r == 0) {
     state->eof = 1;
     return 0;
   }
 
-
   /* execute request */
-  if (execute_request(state, &msg) != 0) {
+  if (execute_request(state, msg) != 0) {
     success = 0;
   }
 
   /* clean up state associated with the message */
-  api_recv_free(&msg);
+  api_recv_free(msg);
 
   return success ? 0 : -1;
 }

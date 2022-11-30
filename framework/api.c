@@ -8,37 +8,39 @@
 
 #include "api.h"
 
-/**
- * @brief         Receive the next message from the sender and stored in @msg
- * @param state   Initialized API state
- * @param msg     Information about message is stored here
- * @return        Returns 1 on new message, 0 in case socket was closed,
- *                or -1 in case of error.
- */
-int api_recv(struct api_state *state, struct api_msg *msg) {
-  assert(state);
-  assert(msg);
+void api_debug_msg(const struct api_msg *msg, const char* str){
+  printf("%s, api msg: %x|%li|%s\n", str, msg->command, msg->msg_size, msg->msg);
+  
+  // uint8_t *bytes = (uint8_t *)msg;
+  // for(int i = 0; i < msg->msg_size + sizeof(struct api_msg); i++){
+  //   printf("%02x ", bytes[i]);
+  // }
+  printf("\n");
+}
 
-  msg = realloc(msg, MSG_LEN_MAX);
+/**
+ * @brief         Receive the next message from the sender and allocates new api_msg in heap memory as buffer
+ * @param state   Initialized API state
+ * @return        Returns pointer to newly allocated api_msg block. command contains the return value of recv
+ */
+struct api_msg *api_recv(struct api_state *state){
+  assert(state);
+
+  struct api_msg * msg = malloc(MSG_LEN_MAX);
 
   int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
-  if(recieved == -1){
-    printf("error: unexpected error while recieving from socket\n");
-    free(msg);
-    return -1;
-  }
+  api_debug_msg(msg, "RECV");
 
-  if(recieved == 0){
-    printf("error: socket closed\n");
-    free(msg);
-    return -1;
+  if(recieved <= 0){
+    printf("socket error");
+    msg->command = recieved;
   }
 
   msg = realloc(msg, recieved);
   msg->msg_size = recieved - sizeof(struct api_msg);
 
-  return 1;
+  return msg;
 }
 
 /**
@@ -83,12 +85,10 @@ void api_state_init(struct api_state *state, int fd) {
 
 }
 
-ssize_t api_send(struct api_state *api, struct api_msg *request){
-  char* buf = malloc(1 + request->msg_size);
-  buf[0] = (char)request->command; 
-  memcpy(buf + 1, request->msg, request->msg_size);
+ssize_t api_send(struct api_state *api, const struct api_msg *request){
+  api_debug_msg(request, "SEND");
 
-  ssize_t sent = send(api->fd, buf, request->msg_size + 1, MSG_DONTWAIT);
+  ssize_t sent = send(api->fd, request, request->msg_size + sizeof(struct api_msg), MSG_DONTWAIT);
 
   return sent;
 }
