@@ -9,7 +9,6 @@
 #include "api.h"
 #include "util.h"
 #include "worker.h"
-#include "map.h"
 #include "workerutil.h"
 
 struct worker_state {
@@ -18,7 +17,6 @@ struct worker_state {
   int server_fd;  /* server <-> worker bidirectional notification channel */
   int server_eof;
   int worker_idx;
-  struct map *users;
   sqlite3 *db;
 
   /* TODO worker state variables go here */
@@ -135,30 +133,15 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-  
   char *err_msg = 0;
 
   //TODO handle different requests
   switch (msg->command) {
     case C_PRIVMSG: {
-      struct string_pair buf;
-      worker_split_string(msg->msg, &buf);
-      int target_fd = map_getfd(state->users, buf.first + 1);
-
-      if(target_fd >= 0){
-        send(target_fd, msg->msg, msg->msg_size, 0);
-      }
+      // TODO handle private message
       break;
     }
     case C_PUBMSG: {
-      // int *fd_all = malloc(MAX_CHILDREN * sizeof(int));
-      // map_getfds_all(state->users, fd_all);
-
-      // for(int i = 0; i < MAX_CHILDREN; i++){
-      //   if(fd_all[i] >= 0){
-      //     send(fd_all[i], msg->msg, msg->msg_size, 0);
-      //   }
-      // }
       char *sql_insert = (char*)malloc(1200 * sizeof(char));
       // using 0 as receiver field to mark a public message, we can change this later 
 
@@ -185,18 +168,11 @@ static int execute_request(
     }
     case C_REGISTER: {
       printf("processing register?\n");
-      struct user new_user;
       struct string_pair buf;
-      printf("string split?\n");
-      worker_split_string(msg->msg, &buf);
-      printf("string split!\n");
-      new_user.username = buf.first;
-      new_user.fd = state->api.fd;
 
-      printf("setting map\n");
-      map_set(state->users, new_user, state->worker_idx);
-      printf("fd %i registered with name (%s)", new_user.fd, new_user.username);
-      send(state->api.fd, "REGISTERED", 11, 0);
+      worker_split_string(msg->msg, &buf);
+
+      // TODO handle register
       break;
     }
     case C_USERS: {
@@ -323,8 +299,7 @@ static int worker_state_init(
   struct worker_state *state,
   int connfd,
   int server_fd,
-  int worker_idx, 
-  struct map *users) {
+  int worker_idx) {
 
   /* initialize */
   memset(state, 0, sizeof(*state));
@@ -332,8 +307,6 @@ static int worker_state_init(
 
   /* set up API state */
   api_state_init(&state->api, connfd);
-
-  state->users = users;
 
   sqlite3 *db;
   
@@ -380,13 +353,12 @@ __attribute__((noreturn))
 void worker_start(
   int connfd,
   int server_fd, 
-  int worker_idx, 
-  struct map *users) {
+  int worker_idx) {
   struct worker_state state;
   int success = 1;
 
   /* initialize worker state */
-  if (worker_state_init(&state, connfd, server_fd, worker_idx, users) != 0) {
+  if (worker_state_init(&state, connfd, server_fd, worker_idx) != 0) {
     goto cleanup;
   }
   /* TODO any additional worker initialization */

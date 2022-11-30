@@ -5,6 +5,7 @@
 
 #include "ui.h"
 #include "util.h"
+#include "string.h"
 
 /**
  * @brief         Frees ui_state context
@@ -23,6 +24,12 @@ void ui_state_free(struct ui_state *state) {
  */
 void ui_state_init(struct ui_state *buf){
   assert(buf);
+}
+
+int ui_input_validate(char* line){
+  // TODO validate input
+  
+  return 0;
 }
 
 void ui_state_fill(char *line, struct ui_state *state){
@@ -46,7 +53,7 @@ void ui_state_fill(char *line, struct ui_state *state){
   state->msg_size = (msg - 1) ? strlen(msg) : 0;
 }
 
-void ui_state_parse(struct ui_state *state, struct api_msg *buf){
+int ui_state_parse(struct ui_state *state, struct api_msg *buf){
     assert(buf);
 
     // parse command type
@@ -58,7 +65,10 @@ void ui_state_parse(struct ui_state *state, struct api_msg *buf){
     else if(strcmp(state->command, "/register") == 0) buf->command = C_REGISTER;
     else if(strcmp(state->command, "/login") == 0) buf->command = C_LOGIN;
     else if(strcmp(state->command, "/users\n") == 0) buf->command = C_USERS;
-  
-    buf->msg = state->msg;
+    else return -1;
+    
+    strncpy(buf->msg, state->msg, state->msg_size);
     buf->msg_size = state->msg_size ? strlen(state->msg) : 0; 
+
+    return 0;
 }

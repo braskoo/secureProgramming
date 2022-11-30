@@ -3,6 +3,10 @@
 
 #include <unistd.h>
 #include <sqlite3.h>
+#include <stddef.h>
+
+#define MSG_LEN_MAX 1024
+#define TXT_LEN_MAX MSG_LEN_MAX - sizeof(struct api_msg)
 
 enum COMMANDS{
   C_PRIVMSG, 
@@ -17,17 +21,18 @@ struct api_state {
   /* TODO add required fields */
 };
 
+// contiguous block
 struct api_msg {
   /* TODO add information about message */
   enum COMMANDS command;
-  char *msg;
   ssize_t msg_size;
+  char msg[];
 };
 
 struct ui_state {
   char *command;
-  char *msg;
   ssize_t msg_size;
+  char *msg;
 };
 
 struct client_state {
