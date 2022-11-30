@@ -142,26 +142,28 @@ static int execute_request(
   switch (msg->command) {
     case C_PRIVMSG: {
       // TODO handle private message
+      char *sql_insert = (char*)malloc(1200 * sizeof(char));
+      sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'%s\', \'%s\')", state->worker_idx, msg->username, msg->msg);
+      if(exec_query(state->db, sql_insert) < 0){
+        free(sql_insert);
+        return -1;
+      }
+      free(sql_insert);
+      notify_workers(state);
       break;
     }
     case C_PUBMSG: {
       char *sql_insert = (char*)malloc(1200 * sizeof(char));
       // using 0 as receiver field to mark a public message, we can change this later 
 
-      sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'-1\', \'%s\')", state->worker_idx, msg->msg);
+      sprintf(sql_insert, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%d\', \'all\', \'%s\')", state->worker_idx, msg->msg);
       
       //Missing error handling for exec
-      int rc = sqlite3_exec(state->db, sql_insert, 0, 0, &err_msg);
-      if (rc != SQLITE_OK ) {
-        
-        fprintf(stderr, "Failed to select data\n");
-        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(state->db));
+      if(exec_query(state->db, sql_insert) < 0){
+        free(sql_insert);
+        return -1;
+      }
 
-        sqlite3_free(err_msg);
-        sqlite3_close(state->db);
-        
-        return 1;
-      } 
       free(sql_insert);
       notify_workers(state);
       // char *sql = "SELECT * FROM Messages";
@@ -180,6 +182,13 @@ static int execute_request(
     }
     case C_USERS: {
       send(state->api.fd, "0THERE ARE NO USERS YET", 24, 0);
+      char *sql_select = (char*)malloc(1200 * sizeof(char));
+      sprintf(sql_select, "SELECT username FROM Users");
+      if(exec_query(state->db, sql_select) < 0){
+        free(sql_select);
+        return -1;
+      }
+      free(sql_select);
       break;
     }
     default: 

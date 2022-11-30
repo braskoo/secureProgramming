@@ -14,6 +14,7 @@
 
 #include "util.h"
 #include "worker.h"
+#include "db.h"
 
 #define MAX_CHILDREN 16
 
@@ -281,9 +282,10 @@ static int server_state_init(struct server_state *state) {
   for (i = 0; i < MAX_CHILDREN; i++) {
     state->children[i].worker_fd = -1;
   }
-
+  
   /* TODO any additional server state initialization */
-
+  sqlite3 *db;
+  initialize_db(&db);
   
   
 
