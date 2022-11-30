@@ -10,6 +10,8 @@ clean:
 
 ui.o: ui.c ui.h
 
+db.o: db.c db.h
+
 client.o: client.c api.h ui.h util.h
 
 api.o: api.c api.h 
@@ -20,11 +22,11 @@ util.o: util.c util.h
 
 workerutil.o: workerutil.c workerutil.h
 
-worker.o: worker.c util.h worker.h 
+worker.o: worker.c util.h worker.h db.o
 
 client: client.o api.o ui.o util.o
 
-server: server.o api.o util.o worker.o workerutil.o
+server: server.o api.o util.o worker.o workerutil.o db.o
 
 
 

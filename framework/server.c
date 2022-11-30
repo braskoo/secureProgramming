@@ -285,7 +285,10 @@ static int server_state_init(struct server_state *state) {
   
   /* TODO any additional server state initialization */
   sqlite3 *db;
-  initialize_db(&db);
+  if(initialize_db(&db) < 0){
+    fprintf(stderr, "error: failed to initialize database\n");
+    return -1;
+  }
   
   
 

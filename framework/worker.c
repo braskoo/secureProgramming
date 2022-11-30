@@ -66,7 +66,7 @@ void get_chat_history(struct worker_state *state){
   sqlite3_stmt *stmt;
 
   if(prepare_db(state->db, select_last, &stmt) < 0) {
-    return -1;
+    return;
   }
   char* msg = malloc(0);
   
@@ -136,20 +136,19 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-  char *err_msg = 0;
 
   //TODO handle different requests
   switch (msg->command) {
     case C_PRIVMSG: {
       // TODO handle private message
-      char *sql_insert = (char*)malloc(1200 * sizeof(char));
-      sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'%s\', \'%s\')", state->worker_idx, msg->username, msg->msg);
-      if(exec_query(state->db, sql_insert) < 0){
-        free(sql_insert);
-        return -1;
-      }
-      free(sql_insert);
-      notify_workers(state);
+      // char *sql_insert = (char*)malloc(1200 * sizeof(char));
+      // sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'%s\', \'%s\')", state->worker_idx, msg->username, msg->msg);
+      // if(exec_query(state->db, sql_insert) < 0){
+      //   free(sql_insert);
+      //   return -1;
+      // }
+      // free(sql_insert);
+      // notify_workers(state);
       break;
     }
     case C_PUBMSG: {
@@ -173,9 +172,9 @@ static int execute_request(
     }
     case C_REGISTER: {
       printf("processing register?\n");
-      struct string_pair buf;
+      // struct string_pair buf;
 
-      worker_split_string(msg->msg, &buf);
+      // worker_split_string(msg->msg, &buf);
 
       // TODO handle register
       break;
@@ -374,9 +373,7 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
-  int size = 0;
-  char *buf = get_chat_history(&state, &size);
-  send(state.api.fd, buf, size, 0);
+  get_chat_history(&state);
   /* handle for incoming requests */
   while (!state.eof) {
     if (handle_incoming(&state) != 0) {
