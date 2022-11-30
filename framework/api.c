@@ -19,15 +19,26 @@ int api_recv(struct api_state *state, struct api_msg *msg) {
   assert(state);
   assert(msg);
 
-  char *buf = calloc(1, 1024);
+  msg = realloc(msg, MSG_LEN_MAX);
 
-  ssize_t recieved = recv(state->fd, buf, 1024, 0);
+  int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
-  msg->command = buf[0];
-  msg->msg = buf + 1;
-  msg->msg_size = recieved - 1;
+  if(recieved == -1){
+    printf("error: unexpected error while recieving from socket\n");
+    free(msg);
+    return -1;
+  }
 
-  return recieved;
+  if(recieved == 0){
+    printf("error: socket closed\n");
+    free(msg);
+    return -1;
+  }
+
+  msg = realloc(msg, recieved);
+  msg->msg_size = recieved - sizeof(struct api_msg);
+
+  return 1;
 }
 
 /**

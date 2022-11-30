@@ -14,7 +14,8 @@
 
 #include "util.h"
 #include "worker.h"
-#include "map.h"
+
+#define MAX_CHILDREN 16
 
 struct server_child_state {
   int worker_fd;  /* server <-> worker bidirectional notification channel */
@@ -163,7 +164,7 @@ static int handle_connection(struct server_state *state) {
     /* worker process */
     close(sockets[0]);
     close_server_handles(state);
-    worker_start(connfd, sockets[1], state->child_count, state->users);
+    worker_start(connfd, sockets[1], state->child_count);
     /* never reached */
     exit(1);
   }
@@ -280,10 +281,6 @@ static int server_state_init(struct server_state *state) {
   for (i = 0; i < MAX_CHILDREN; i++) {
     state->children[i].worker_fd = -1;
   }
-
-  struct map users;
-  map_init(&users);
-  state->users = &users;
 
   /* TODO any additional server state initialization */
 

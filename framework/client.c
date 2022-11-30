@@ -53,26 +53,21 @@ static int client_process_command(struct client_state *state) {
 
   if (getline(&line, &len, stdin) == -1){
     state->eof = 1;
-    return -1;
+    goto cleanup;
   }
 
-  if(line[0] != ' '){
-    printf("command invalid: missing whitespace\n");
-    free(line);
-    return 0;
-  }
+  ui_input_validate(line);
 
-  ui_state_init(&state->ui);
-
-  // fill ui state with appropriate information from line (without first space)
-  ui_state_fill(line + 1, &state->ui);
+  // fill ui state with appropriate information from line
+  ui_state_fill(line, &state->ui);
 
   struct api_msg request;
-  ui_state_parse(&state->ui, &request);
-  
+  if(ui_state_parse(&state->ui, &request) == -1){
+    printf("invalid command, please try again\n");
+    goto cleanup;
+  }
 
   ssize_t sent = api_send(&state->api, &request);
-
 
   if(sent == -1){
     perror("socket closed");
@@ -80,6 +75,7 @@ static int client_process_command(struct client_state *state) {
     exit(-1);
   }
 
+  cleanup:
   free(line);
 
   return 0;  

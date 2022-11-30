@@ -3,8 +3,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "map.h"
-
 void map_delete(struct map *map, int idx){
     assert(map);
     free(map->users[idx].username);
