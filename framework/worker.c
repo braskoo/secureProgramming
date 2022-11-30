@@ -10,6 +10,7 @@
 #include "util.h"
 #include "worker.h"
 #include "workerutil.h"
+#include "db.h"
 
 struct worker_state {
   struct api_state api;
@@ -38,30 +39,27 @@ void send_ack(struct api_state state){
 static int handle_s2w_notification(struct worker_state *state) {
   /* TODO implement the function */
  
-  int sender, length; 
-  const unsigned char *time, *message;
-  char *select_last = "SELECT LENGTH(Message)+LENGTH(Time)+LENGTH(Sender), Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
+  int length = 0; 
+  const unsigned char *time, *message, *sender;
+  char *select_last = "SELECT Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
   sqlite3_stmt *stmt;
 
-  int rc = sqlite3_prepare_v2(state->db, select_last, -1, &stmt, NULL);
-  if (rc != SQLITE_OK ) {
-    printf("error: %s\n", sqlite3_errmsg(state->db));
-    sqlite3_close(state->db);
-    return 1;
+  if(prepare_db(state->db, select_last, &stmt) < 0) {
+    return -1;
   }
 
   if(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_int(stmt, 0);
-    sender = sqlite3_column_int(stmt, 1);
-    time = sqlite3_column_text(stmt, 2);
-    message = sqlite3_column_text(stmt, 3);
+    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + 3;
+    sender = sqlite3_column_text(stmt, 0);
+    time = sqlite3_column_text(stmt, 1);
+    message = sqlite3_column_text(stmt, 2);
   }
 
-  char* msg = malloc(length);
-  sprintf(msg, "%s %d: %s\n", time, sender, message);
+  char* msg = malloc(length+7);
+  int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
 
-  ssize_t size = send(state->api.fd, msg-1, length+4, 0);
-  if(size < 0){
+  ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
+  if(sent < 0){
     perror("error: cannot write to client");
     return -1;
   }
@@ -69,6 +67,39 @@ static int handle_s2w_notification(struct worker_state *state) {
   sqlite3_finalize(stmt);
   return 0;
 }
+
+void get_chat_history(struct worker_state *state){
+  int length = 0; 
+  const unsigned char *time, *message, *sender;
+  char *select_last = "SELECT Sender, Time, Message FROM Messages";
+  sqlite3_stmt *stmt;
+
+  if(prepare_db(state->db, select_last, &stmt) < 0) {
+    return;
+  }
+  char* msg = malloc(0);
+  
+  while(sqlite3_step(stmt) == SQLITE_ROW){
+    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2)+3;
+    sender = sqlite3_column_text(stmt, 0);
+    time = sqlite3_column_text(stmt, 1);
+    message = sqlite3_column_text(stmt, 2);
+    msg = realloc(msg, length+7);
+    int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
+    printf("%d\n", msg_size);
+
+    ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
+    sleep(0.1);
+    if(sent < 0){
+      perror("error: cannot write to client");
+      return;
+    }
+  }
+  free(msg);
+  sqlite3_finalize(stmt);
+  
+}
+
 
 /**
  * @brief         Notifies server that the worker received a new message
@@ -114,32 +145,33 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-  char *err_msg = 0;
 
   //TODO handle different requests
   switch (msg->command) {
     case C_PRIVMSG: {
       // TODO handle private message
+      // char *sql_insert = (char*)malloc(1200 * sizeof(char));
+      // sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'%s\', \'%s\')", state->worker_idx, msg->username, msg->msg);
+      // if(exec_query(state->db, sql_insert) < 0){
+      //   free(sql_insert);
+      //   return -1;
+      // }
+      // free(sql_insert);
+      // notify_workers(state);
       break;
     }
     case C_PUBMSG: {
       char *sql_insert = (char*)malloc(1200 * sizeof(char));
       // using 0 as receiver field to mark a public message, we can change this later 
 
-      sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'-1\', \'%s\')", state->worker_idx, msg->msg);
+      sprintf(sql_insert, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%d\', \'all\', \'%s\')", state->worker_idx, msg->msg);
       
       //Missing error handling for exec
-      int rc = sqlite3_exec(state->db, sql_insert, 0, 0, &err_msg);
-      if (rc != SQLITE_OK ) {
-        
-        fprintf(stderr, "Failed to select data\n");
-        fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(state->db));
+      if(exec_query(state->db, sql_insert) < 0){
+        free(sql_insert);
+        return -1;
+      }
 
-        sqlite3_free(err_msg);
-        sqlite3_close(state->db);
-        
-        return 1;
-      } 
       free(sql_insert);
       notify_workers(state);
       // char *sql = "SELECT * FROM Messages";
@@ -150,14 +182,22 @@ static int execute_request(
     }
     case C_REGISTER: {
       printf("processing register?\n");
+      // struct string_pair buf;
 
-      worker_split_string(msg->msg);
+      // worker_split_string(msg->msg, &buf);
 
       // TODO handle register
       break;
     }
     case C_USERS: {
       send(state->api.fd, "0THERE ARE NO USERS YET", 24, 0);
+      char *sql_select = (char*)malloc(1200 * sizeof(char));
+      sprintf(sql_select, "SELECT username FROM Users");
+      if(exec_query(state->db, sql_select) < 0){
+        free(sql_select);
+        return -1;
+      }
+      free(sql_select);
       break;
     }
     default: 
@@ -340,8 +380,7 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
-
-
+  get_chat_history(&state);
   /* handle for incoming requests */
   while (!state.eof) {
     if (handle_incoming(&state) != 0) {

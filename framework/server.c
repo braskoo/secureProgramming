@@ -14,6 +14,7 @@
 
 #include "util.h"
 #include "worker.h"
+#include "db.h"
 
 #define MAX_CHILDREN 16
 
@@ -281,40 +282,16 @@ static int server_state_init(struct server_state *state) {
   for (i = 0; i < MAX_CHILDREN; i++) {
     state->children[i].worker_fd = -1;
   }
-
+  
   /* TODO any additional server state initialization */
-
-  
-  
-
-  return 0;
-}
-
-static int database_cleaning(){
   sqlite3 *db;
-  char *errMsg = 0;
-
-  int rc = sqlite3_open("chat.db", &db);
-
-  if (rc != SQLITE_OK) {
-    fprintf(stderr, "Failed to open and clean db, %s\n", sqlite3_errmsg(db));
-    sqlite3_close(db);
-    
-    return 1;
+  if(initialize_db(&db) < 0){
+    fprintf(stderr, "error: failed to initialize database\n");
+    return -1;
   }
-  char *sql = "DELETE FROM Messages";
+  
+  
 
-  rc = sqlite3_exec(db, sql, 0, 0, &errMsg);
-
-  if (rc != SQLITE_OK ) {
-    fprintf(stderr, "Failed to select data\n");
-    fprintf(stderr, "SQL error: %s\n", sqlite3_errmsg(db));
-
-    sqlite3_free(errMsg);
-    sqlite3_close(db);
-    return 1;
-  }
-  sqlite3_close(db);
   return 0;
 }
 
@@ -322,7 +299,7 @@ static void server_state_free(struct server_state *state) {
   int i;
 
   /* TODO any additional server state cleanup */
-  database_cleaning();
+
   for (i = 0; i < MAX_CHILDREN; i++) {
     close(state->children[i].worker_fd);
   }
