@@ -24,10 +24,8 @@ struct worker_state {
 };
 
 void send_ack(struct api_state state){
-  struct api_msg *msg = malloc(sizeof(struct api_msg) + sizeof("ACK"));
-  msg->msg_size = sizeof("ACK");
-  msg->code.command = R_ACK;
-  strncpy(msg->msg, "ACK", msg->msg_size);
+  union CODE code = {R_ACK};
+  struct api_msg *msg = api_msg_compose(code, sizeof("ACK"), "ACK");
 
   api_send(&state, msg);
 }
