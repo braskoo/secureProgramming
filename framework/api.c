@@ -10,12 +10,6 @@
 
 void api_debug_msg(const struct api_msg *msg, const char* str){
   printf("%s, api msg: %x|%li|%s\n", str, msg->command, msg->msg_size, msg->msg);
-  
-  // uint8_t *bytes = (uint8_t *)msg;
-  // for(int i = 0; i < msg->msg_size + sizeof(struct api_msg); i++){
-  //   printf("%02x ", bytes[i]);
-  // }
-  printf("\n");
 }
 
 /**

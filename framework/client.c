@@ -53,7 +53,8 @@ static int client_process_command(struct client_state *state) {
 
   if (getline(&line, &len, stdin) == -1){
     state->eof = 1;
-    goto cleanup;
+    free(line);
+    return -1;
   }
 
   ui_input_validate(line);
@@ -71,6 +72,7 @@ static int client_process_command(struct client_state *state) {
   }
 
   ssize_t sent = api_send(&state->api, request);
+  
 
   if(sent == -1){
     perror("socket closed");
@@ -80,6 +82,7 @@ static int client_process_command(struct client_state *state) {
 
   cleanup:
   free(line);
+  free(request);
 
   return 0; 
 }

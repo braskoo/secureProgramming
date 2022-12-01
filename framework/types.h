@@ -8,16 +8,19 @@
 #define MSG_LEN_MAX 1024
 #define TXT_LEN_MAX MSG_LEN_MAX - sizeof(struct api_msg)
 
-enum CODES{
-  C_SOCKERR = -1,
-  C_SOCKCLOSED = 0,
+enum COMMANDS {
   C_INVALID,
   C_PRIVMSG, 
   C_PUBMSG,
   C_REGISTER,
   C_USERS,
-  C_LOGIN,
-  C_ACK
+  C_LOGIN
+};
+
+enum REPLIES {
+  R_SOCKERR = -1,
+  R_SOCKCLOSED = 0,
+  R_ACK
 };
 
 struct api_state {
@@ -28,7 +31,11 @@ struct api_state {
 // contiguous block
 struct api_msg {
   /* TODO add information about message */
-  enum CODES command;
+  union code {
+    enum COMMANDS command;
+    enum REPLIES reply;
+  };
+  
   ssize_t msg_size;
   char msg[];
 };
