@@ -9,7 +9,15 @@
 #include "api.h"
 
 void api_debug_msg(const struct api_msg *msg, const char* str){
-  printf("%s, api msg: %x|%li|%s\n", str, msg->command, msg->msg_size, msg->msg);
+  int code = 0;
+
+  if(strncmp(str, "RECV", sizeof("RECV"))){
+    code = msg->code.command;
+  } else {
+    code = msg->code.reply;
+  }
+
+  printf("%s, api msg: %x|%li|%s\n", str, code, msg->msg_size, msg->msg);
 }
 
 /**
@@ -28,25 +36,13 @@ struct api_msg *api_recv(struct api_state *state){
 
   if(recieved <= 0){
     printf("socket error");
-    msg->command = recieved;
+    msg->code.command = recieved;
   }
 
   msg = realloc(msg, recieved);
   msg->msg_size = recieved - sizeof(struct api_msg);
 
   return msg;
-}
-
-/**
- * @brief         Clean up information stored in @msg
- * @param msg     Information about message to be cleaned up
- */
-void api_recv_free(struct api_msg *msg) {
-
-  assert(msg);
-
-  /* TODO clean up state allocated for msg */
-
 }
 
 /**

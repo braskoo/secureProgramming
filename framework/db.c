@@ -23,7 +23,7 @@ int initialize_db(sqlite3 *db) {
     int rc;
 
     rc = sqlite3_open("chat.db", &db);
-    if (rc != SQLITE_OK ) {
+    if (rc != SQLITE_OK) {
         printf("error: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return -1;

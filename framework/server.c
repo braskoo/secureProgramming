@@ -25,9 +25,9 @@ struct server_child_state {
 
 struct server_state {
   int sockfd;
-  struct map *users;
   struct server_child_state children[MAX_CHILDREN];
   int child_count;
+  sqlite3 *db;
 };
 
 static int create_server_socket(uint16_t port) {
@@ -289,8 +289,8 @@ static int server_state_init(struct server_state *state) {
     fprintf(stderr, "error: failed to initialize database\n");
     return -1;
   }
-  
-  
+
+  state->db = db;
 
   return 0;
 }
@@ -298,7 +298,8 @@ static int server_state_init(struct server_state *state) {
 static void server_state_free(struct server_state *state) {
   int i;
 
-  /* TODO any additional server state cleanup */
+  sqlite3_close(state->db);
+  sqlite3_free(state->db);
 
   for (i = 0; i < MAX_CHILDREN; i++) {
     close(state->children[i].worker_fd);

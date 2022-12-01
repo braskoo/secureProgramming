@@ -26,7 +26,7 @@ struct worker_state {
 void send_ack(struct api_state state){
   struct api_msg *msg = malloc(sizeof(struct api_msg) + sizeof("ACK"));
   msg->msg_size = sizeof("ACK");
-  msg->command = C_ACK;
+  msg->code.command = R_ACK;
   strncpy(msg->msg, "ACK", msg->msg_size);
 
   api_send(&state, msg);
@@ -147,7 +147,7 @@ static int execute_request(
 
 
   //TODO handle different requests
-  switch (msg->command) {
+  switch (msg->code.command) {
     case C_PRIVMSG: {
       // TODO handle private message
       // char *sql_insert = (char*)malloc(1200 * sizeof(char));
@@ -219,7 +219,7 @@ static int handle_client_request(struct worker_state *state) {
 
   struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
-  r = msg->command;
+  r = msg->code.command;
   if (r < 0) return -1;
   if (r == 0) {
     state->eof = 1;
@@ -232,7 +232,7 @@ static int handle_client_request(struct worker_state *state) {
   }
 
   /* clean up state associated with the message */
-  api_recv_free(msg);
+  free(msg);
 
   return success ? 0 : -1;
 }
