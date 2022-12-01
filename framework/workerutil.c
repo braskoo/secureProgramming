@@ -4,6 +4,7 @@
 
 #include "workerutil.h"
 
+// splits string into two parts UNUSED
 void worker_split_string(const char line[]){
     char *split_idx = strchr(line, ' ');
 
