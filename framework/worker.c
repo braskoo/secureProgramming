@@ -97,7 +97,6 @@ void get_chat_history(struct worker_state *state){
   }
   free(msg);
   sqlite3_finalize(stmt);
-  
 }
 
 

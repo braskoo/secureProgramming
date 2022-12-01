@@ -60,19 +60,20 @@ static int client_process_command(struct client_state *state) {
   // fill ui state with appropriate information from line and validate input
   ui_state_fill(line, &state->ui);
 
-  struct api_msg *request = ui_state_parse(&state->ui);
+  enum COMMANDS command = ui_command_parse(&state->ui);
+  union CODE code = {command};
 
-  if(request->code.command == C_EXIT){
+  if(command == C_EXIT){
     free(line);
-    free(request);
     return -1;
   }
 
-  if(request->code.command == C_INVALID){
+  if(command == C_INVALID){
     printf("invalid command, please try again\n");
     goto cleanup;
   }
 
+  struct api_msg *request = api_msg_compose(code, state->ui.msg_size, state->ui.msg);
   ssize_t sent = api_send(&state->api, request);
   
   if(sent == -1){
@@ -81,10 +82,10 @@ static int client_process_command(struct client_state *state) {
     exit(-1);
   }
 
-  cleanup:
-  free(line);
   free(request);
 
+  cleanup:
+  free(line);
   return 0; 
 }
 

@@ -28,7 +28,7 @@ void api_debug_msg(const struct api_msg *msg, const char* str){
 struct api_msg *api_recv(struct api_state *state){
   assert(state);
 
-  struct api_msg * msg = malloc(MSG_LEN_MAX);
+  struct api_msg *msg = malloc(MSG_LEN_MAX);
 
   int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
@@ -41,6 +41,18 @@ struct api_msg *api_recv(struct api_state *state){
 
   msg = realloc(msg, recieved);
   msg->msg_size = recieved - sizeof(struct api_msg);
+
+  return msg;
+}
+
+struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text){
+  assert(text);
+
+  struct api_msg *msg = malloc(size + sizeof(struct api_msg));
+
+  msg->code = code;
+  msg->msg_size = size;
+  strncpy(msg->msg, text, size);
 
   return msg;
 }

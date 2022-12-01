@@ -6,7 +6,7 @@
 void api_debug_msg(const struct api_msg *msg, const char* str);
 
 struct api_msg *api_recv(struct api_state *state);
-
+struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text);
 void api_state_free(struct api_state *state);
 void api_state_init(struct api_state *state, int fd);
 
