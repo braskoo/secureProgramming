@@ -18,7 +18,12 @@ int prepare_db(sqlite3 *db, char *sql_stmt, sqlite3_stmt **ppStmt) {
 }
 
 int initialize_db(sqlite3 *db) {
-    char *sql;
+    char *sql = malloc( (161 * sizeof(char)) + 1);
+    if (sql == NULL) {
+        printf("Memory not allocated.\n");
+        return -1;
+    }
+
     char *err_msg = 0;
     int rc;
 
@@ -29,11 +34,11 @@ int initialize_db(sqlite3 *db) {
         return -1;
     }
 
-    sql = "CREATE TABLE IF NOT EXISTS Messages("  \
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS Messages("  \
         "sender TEXT NOT NULL," \
         "receiver TEXT NOT NULL," \
         "time InDtTm DATETIME DEFAULT CURRENT_TIMESTAMP," \
-        "message NVARCHAR(1024) NOT NULL);";
+        "message NVARCHAR(1024) NOT NULL);");
 
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK ) {
@@ -42,11 +47,13 @@ int initialize_db(sqlite3 *db) {
         sqlite3_close(db);
         return -1;
     }
+    
+    sql = realloc(sql, 104*sizeof(char));
 
-    sql = "CREATE TABLE IF NOT EXISTS Users("  \
+    strcpy(sql, "CREATE TABLE IF NOT EXISTS Users("  \
             "username TEXT NOT NULL," \
             "password TEXT NOT NULL," \
-            "PRIMARY KEY(username));";
+            "PRIMARY KEY(username));");
   
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK ) {
@@ -55,6 +62,8 @@ int initialize_db(sqlite3 *db) {
         sqlite3_close(db);
         return -1;
     }
+    free(sql);
+    sqlite3_close(db);
     return 0;
 }
 
