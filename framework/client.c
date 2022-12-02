@@ -47,6 +47,8 @@ static int client_connect(struct client_state *state,
 static int client_process_command(struct client_state *state) {
   assert(state);
 
+  int ret;
+
   setvbuf(stdout, NULL, _IONBF, 0);
   char *line = NULL;
   size_t len = 0;
@@ -73,6 +75,7 @@ static int client_process_command(struct client_state *state) {
 
   if(command == C_INVALID){
     printf("invalid command, please try again\n");
+    ret = 0;
     goto cleanup;
   }
 
@@ -82,14 +85,15 @@ static int client_process_command(struct client_state *state) {
   if(sent == -1){
     perror("socket closed");
     printf("hihi ur socket sucks\n");
-    exit(-1);
+    ret = -1;
   }
 
+  ret = 0;
   free(request);
 
   cleanup:
   free(line);
-  return 0; 
+  return ret;
 }
 
 /**

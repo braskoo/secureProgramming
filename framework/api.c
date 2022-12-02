@@ -37,10 +37,12 @@ struct api_msg *api_recv(struct api_state *state){
   if(recieved <= 0){
     printf("socket error");
     msg->code.command = recieved;
+    msg = realloc(msg, sizeof(struct api_msg));
+    msg->msg_size = 0;
+  } else {
+    msg = realloc(msg, recieved);
+    msg->msg_size = recieved - sizeof(struct api_msg);
   }
-
-  msg = realloc(msg, recieved);
-  msg->msg_size = recieved - sizeof(struct api_msg);
 
   return msg;
 }
