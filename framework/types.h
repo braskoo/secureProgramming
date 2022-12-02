@@ -21,14 +21,15 @@ enum COMMANDS{
 enum REPLIES{
   R_SOCKERR = -1,
   R_SOCKCLOSED = 0,
-  R_ACK
+  R_ACK,
+  R_PRIVMSG,
+  R_PUBMSG
 };
 
 union CODE{
   enum REPLIES reply;
   enum COMMANDS command;
 };
-
 
 struct api_state {
   int fd;

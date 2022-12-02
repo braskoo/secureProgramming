@@ -56,7 +56,7 @@ static int handle_s2w_notification(struct worker_state *state) {
   char* msg = malloc(length+7);
   int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
   
-  union CODE code = {C_PUBMSG};
+  union CODE code = {R_PUBMSG};
 
   struct api_msg* notifs = api_msg_compose(code, msg_size, msg);
   api_send(&state->api, notifs);
@@ -160,12 +160,14 @@ static int execute_request(
       break;
     }
     case C_PUBMSG: {
-      char *sql_insert = (char*)malloc((74 * sizeof(char)) + msg->msg_size + 1);
+      char *sql_insert = (char*)malloc((75 * sizeof(char)) + msg->msg_size);
       // using 0 as receiver field to mark a public message, we can change this later 
       printf("in pubmsg: %s\n", msg->msg);
       sprintf(sql_insert, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%d\', \'all\', \'%s\')", state->worker_idx, msg->msg);
       
       //Missing error handling for exec
+      printf("query: %s\n", sql_insert);
+
       if(exec_query(state->db, sql_insert) < 0){
         free(sql_insert);
         return -1;
@@ -173,9 +175,6 @@ static int execute_request(
 
       free(sql_insert);
       notify_workers(state);
-      // char *sql = "SELECT * FROM Messages";
-      // printf("your insert succeed\n");
-      // sqlite3_exec(state->db, sql, callback, 0, &err_msg);
       send_ack(state->api);
       break;
     }

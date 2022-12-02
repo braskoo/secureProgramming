@@ -57,6 +57,9 @@ static int client_process_command(struct client_state *state) {
     return -1;
   }
 
+  // replace \n by \0
+  line[strlen(line) - 1] = '\0'; 
+
   // fill ui state with appropriate information from line and validate input
   ui_state_fill(line, &state->ui);
 
@@ -95,7 +98,7 @@ static int client_process_command(struct client_state *state) {
  * @param msg     Message to handle
  */
 static int execute_request(struct client_state *state, const struct api_msg *msg) {
-  printf("%s", msg->msg);
+  printf("%s\n", msg->msg);
 
   return 0;
 }
