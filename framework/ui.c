@@ -44,7 +44,7 @@ void ui_state_fill(char *line, struct ui_state *state){
   state->msg = msg;
 
   // we check if strchr returned NULL
-  state->msg_size = (msg - 1) ? strlen(msg) : 0;
+  state->msg_size = (msg - 1) ? strlen(msg) + 1 : 0;
 }
 
 // parses command
