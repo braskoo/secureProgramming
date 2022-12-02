@@ -57,9 +57,6 @@ static int client_process_command(struct client_state *state) {
     return -1;
   }
 
-  // replace \n by \0
-  line[strlen(line) - 1] = '\0'; 
-
   // fill ui state with appropriate information from line and validate input
   ui_state_fill(line, &state->ui);
 

@@ -86,7 +86,7 @@ void get_chat_history(struct worker_state *state){
     time = sqlite3_column_text(stmt, 1);
     message = sqlite3_column_text(stmt, 2);
     msg = realloc(msg, length+7);
-    int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
+    int msg_size = sprintf(msg, "%s %s: %s", time, sender, message) + 1;
     printf("msg: %s\n", message);
     notifs = api_msg_compose(code, msg_size, msg);
     printf("%ld: %s\n", notifs->msg_size, notifs->msg);
