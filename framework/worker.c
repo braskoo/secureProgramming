@@ -52,9 +52,9 @@ static int handle_s2w_notification(struct worker_state *state) {
     time = sqlite3_column_text(stmt, 1);
     message = sqlite3_column_text(stmt, 2);
   }
-  printf("length: %d\n", length);
+  
   char* msg = malloc(length+7);
-  int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
+  int msg_size = sprintf(msg, "%s %s: %s", time, sender, message) + 1; // null terminator
   
   union CODE code = {R_PUBMSG};
 

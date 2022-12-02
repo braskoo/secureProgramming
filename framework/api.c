@@ -45,6 +45,7 @@ struct api_msg *api_recv(struct api_state *state){
   return msg;
 }
 
+// size has to include null terminator
 struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text){
   assert(text);
 
