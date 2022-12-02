@@ -39,7 +39,7 @@ static int handle_s2w_notification(struct worker_state *state) {
  
   int length = 0; 
   const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT Sender, Time, Message FROM Messages ORDER BY Time DESC LIMIT 1";
+  char *select_last = "SELECT sender, time, message FROM Messages ORDER BY Time DESC LIMIT 1";
   sqlite3_stmt *stmt;
 
   if(prepare_db(state->db, select_last, &stmt) < 0) {
@@ -52,16 +52,17 @@ static int handle_s2w_notification(struct worker_state *state) {
     time = sqlite3_column_text(stmt, 1);
     message = sqlite3_column_text(stmt, 2);
   }
-
+  printf("length: %d\n", length);
   char* msg = malloc(length+7);
   int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
+  
+  union CODE code = {C_PUBMSG};
 
-  ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
-  if(sent < 0){
-    perror("error: cannot write to client");
-    return -1;
-  }
+  struct api_msg* notifs = api_msg_compose(code, msg_size, msg);
+  api_send(&state->api, notifs);
+
   free(msg);
+  free(notifs);
   sqlite3_finalize(stmt);
   return 0;
 }
@@ -69,14 +70,16 @@ static int handle_s2w_notification(struct worker_state *state) {
 void get_chat_history(struct worker_state *state){
   int length = 0; 
   const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT Sender, Time, Message FROM Messages";
+  char *select_last = "SELECT sender, time, message FROM Messages";
   sqlite3_stmt *stmt;
 
   if(prepare_db(state->db, select_last, &stmt) < 0) {
     return;
   }
   char* msg = malloc(0);
-  
+  union CODE code = {C_PUBMSG};
+  struct api_msg* notifs;
+
   while(sqlite3_step(stmt) == SQLITE_ROW){
     length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2)+3;
     sender = sqlite3_column_text(stmt, 0);
@@ -84,14 +87,13 @@ void get_chat_history(struct worker_state *state){
     message = sqlite3_column_text(stmt, 2);
     msg = realloc(msg, length+7);
     int msg_size = sprintf(msg, "%s %s: %s", time, sender, message);
-    printf("%d\n", msg_size);
+    printf("msg: %s\n", message);
+    notifs = api_msg_compose(code, msg_size, msg);
+    printf("%ld: %s\n", notifs->msg_size, notifs->msg);
+    api_send(&state->api, notifs);
 
-    ssize_t sent = send(state->api.fd, msg-1, msg_size+1, 0);
     sleep(0.1);
-    if(sent < 0){
-      perror("error: cannot write to client");
-      return;
-    }
+    free(notifs);
   }
   free(msg);
   sqlite3_finalize(stmt);
@@ -158,9 +160,9 @@ static int execute_request(
       break;
     }
     case C_PUBMSG: {
-      char *sql_insert = (char*)malloc(1200 * sizeof(char));
+      char *sql_insert = (char*)malloc((74 * sizeof(char)) + msg->msg_size + 1);
       // using 0 as receiver field to mark a public message, we can change this later 
-
+      printf("in pubmsg: %s\n", msg->msg);
       sprintf(sql_insert, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%d\', \'all\', \'%s\')", state->worker_idx, msg->msg);
       
       //Missing error handling for exec

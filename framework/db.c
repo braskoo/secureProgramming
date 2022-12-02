@@ -39,7 +39,7 @@ int initialize_db(sqlite3 *db) {
         "receiver TEXT NOT NULL," \
         "time InDtTm DATETIME DEFAULT CURRENT_TIMESTAMP," \
         "message NVARCHAR(1024) NOT NULL);");
-
+        
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK ) {
         printf("error: %s\n", sqlite3_errmsg(db));
@@ -47,7 +47,7 @@ int initialize_db(sqlite3 *db) {
         sqlite3_close(db);
         return -1;
     }
-    
+
     sql = realloc(sql, 104*sizeof(char));
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS Users("  \
