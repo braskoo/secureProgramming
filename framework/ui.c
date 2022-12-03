@@ -59,7 +59,7 @@ enum COMMANDS ui_command_parse(struct ui_state *state){
   else if(strcmp(state->command, "/exit\n") == 0) command = C_EXIT;
   else if(strcmp(state->command, "/register") == 0) command = C_REGISTER;
   else if(strcmp(state->command, "/login") == 0) command = C_LOGIN;
-  else if(strcmp(state->command, "/users\n") == 0) command = C_USERS;
+  else if(strcmp(state->command, "/users") == 0) command = C_USERS;
   else command = C_INVALID;
 
   return command;

@@ -23,7 +23,9 @@ enum REPLIES{
   R_SOCKCLOSED = 0,
   R_ACK,
   R_PRIVMSG,
-  R_PUBMSG
+  R_PUBMSG,
+  R_LOGIN,
+  R_INVALID
 };
 
 union CODE{
