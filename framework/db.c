@@ -49,12 +49,13 @@ int initialize_db(sqlite3 *db) {
         return -1;
     }
 
-    sql = realloc(sql, 127*sizeof(char));
+    sql = realloc(sql, 174*sizeof(char));
 
     strcpy(sql, "CREATE TABLE IF NOT EXISTS Users("  \
             "username TEXT NOT NULL," \
             "password TEXT NOT NULL," \
             "status INTEGER NOT NULL," \
+            "time InDtTm DATETIME DEFAULT CURRENT_TIMESTAMP," \
             "PRIMARY KEY(username));");
   
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
@@ -85,24 +86,47 @@ int exec_query(sqlite3 *db, char *sql_stmt) {
 
 void load_msgs(struct api_state *api, sqlite3_stmt *stmt){
     int length = 0; 
-    const unsigned char *time, *message, *sender;
+    const unsigned char *time, *message, *sender, *receiver;
     char* msg = malloc(0);
     union CODE code = {C_PUBMSG};
     struct api_msg* notifs;
 
     while(sqlite3_step(stmt) == SQLITE_ROW){
-        length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2)+3;
+        length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt,3) + 4;
         sender = sqlite3_column_text(stmt, 0);
-        time = sqlite3_column_text(stmt, 1);
-        message = sqlite3_column_text(stmt, 2);
-        msg = realloc(msg, length+4);
-        int msg_size = sprintf(msg, "%s %s: %s", time, sender, message) + 1;
+        receiver = sqlite3_column_text(stmt, 1);
+        time = sqlite3_column_text(stmt, 2);
+        message = sqlite3_column_text(stmt, 3);
+        msg = realloc(msg, length+6);
+        int msg_size = sprintf(msg, "%s %s:%s %s", time, sender, receiver, message) + 1;
 
         notifs = api_msg_compose(code, msg_size, msg);
         api_send(api, notifs);
 
         sleep(0.1);
         free(notifs);
+    }
+    free(msg);
+}
+
+void load_users(struct api_state *api, sqlite3_stmt *stmt){
+    int length = 0;
+    const unsigned char *user;
+    char* msg = malloc(0);
+    union CODE code = {C_USERS};
+    struct api_msg* userlist;
+
+    while(sqlite3_step(stmt) == SQLITE_ROW){
+        length = sqlite3_column_bytes(stmt, 0) + 1;
+        user = sqlite3_column_text(stmt, 0);
+        msg = realloc(msg, length+2);
+        int msg_size = sprintf(msg, "%s", user) + 1;
+
+        userlist = api_msg_compose(code, msg_size, msg);
+        api_send(api, userlist);
+
+        sleep(0.1);
+        free(userlist);
     }
     free(msg);
 }

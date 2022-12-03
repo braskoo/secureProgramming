@@ -32,7 +32,7 @@ struct api_msg *api_recv(struct api_state *state){
 
   int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
-  api_debug_msg(msg, "RECV");
+  //api_debug_msg(msg, "RECV");
 
   if(recieved <= 0){
     printf("socket error");
@@ -91,7 +91,7 @@ void api_state_init(struct api_state *state, int fd) {
 }
 
 ssize_t api_send(struct api_state *api, const struct api_msg *request){
-  api_debug_msg(request, "SEND");
+  // api_debug_msg(request, "SEND");
 
   ssize_t sent = send(api->fd, request, request->msg_size + sizeof(struct api_msg), MSG_DONTWAIT);
 

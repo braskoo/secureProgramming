@@ -25,6 +25,7 @@ enum REPLIES{
   R_PRIVMSG,
   R_PUBMSG,
   R_LOGIN,
+  R_REGISTER,
   R_INVALID
 };
 
