@@ -54,3 +54,21 @@ int parse_port(const char *str, uint16_t *port_p) {
   *port_p = value;
   return 0;
 }
+
+void handlespace(char * str)
+{
+  int index = 0, i;
+  
+  while(str[index] == ' ' || str[index] == '\t' || str[index] == '\n'){
+    index++;
+  }
+
+  if(index != 0){
+    i = 0;
+    while(str[i + index] != '\0'){
+        str[i] = str[i + index];
+        i++;
+    }
+    str[i] = '\0';
+  }
+}

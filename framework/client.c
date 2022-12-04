@@ -61,26 +61,26 @@ static int client_process_command(struct client_state *state) {
 
   // replace \n by \0
   line[strlen(line) - 1] = '\0'; 
-
+  handlespace(line);
   // fill ui state with appropriate information from line and validate input
   ui_state_fill(line, &state->ui);
 
   enum COMMANDS command = ui_command_parse(&state->ui);
   union CODE code = {command};
 
-  if(command == C_EXIT){
-    free(line);
-    return -1;
-  }
+  // if(command == C_EXIT){
+  //   free(line);
+  //   return -1;
+  // }
 
   if(command == C_INVALID){
-    printf("error: invalid command format");
+    printf("error: invalid command format\n");
     ret = 0;
     goto cleanup;
   }
 
   if(command == C_UNKNOWN){
-    printf("error: unknown command %s", state->ui.command);
+    printf("error: unknown command %s\n", state->ui.command);
     ret = 0;
     goto cleanup;
   }

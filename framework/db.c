@@ -86,20 +86,20 @@ int exec_query(sqlite3 *db, char *sql_stmt) {
 
 void load_msgs(struct api_state *api, sqlite3_stmt *stmt){
     int length = 0; 
-    char *message;
+    char *message = NULL;
     
     union CODE code = {C_PUBMSG};
-    struct api_msg* notifs;
+    struct api_msg* notifs = NULL;
 
     while(sqlite3_step(stmt) == SQLITE_ROW){
         length = sqlite3_column_bytes(stmt, 0) + 1;
         message = realloc(message, length);
         memccpy(message, sqlite3_column_text(stmt, 0), '\0', length);
     
-        notifs = api_msg_compose(code, length, message);
+        notifs = api_msg_compose(code, length + 1, message);
         api_send(api, notifs);
 
-        sleep(0.2);
+        sleep(0.5);
         free(notifs);
     }
     free(message);
@@ -108,14 +108,15 @@ void load_msgs(struct api_state *api, sqlite3_stmt *stmt){
 void load_users(struct api_state *api, sqlite3_stmt *stmt){
     int length = 0;
     const unsigned char *user;
-    char* msg = malloc(0);
+    char* msg = NULL;
     union CODE code = {C_USERS};
-    struct api_msg* userlist;
+    struct api_msg* userlist = NULL;
 
     while(sqlite3_step(stmt) == SQLITE_ROW){
         length = sqlite3_column_bytes(stmt, 0) + 1;
         user = sqlite3_column_text(stmt, 0);
-        msg = realloc(msg, length+2);
+        msg = realloc(msg, length+1);
+        printf("hij is hier\n");
         int msg_size = sprintf(msg, "%s", user) + 1;
 
         userlist = api_msg_compose(code, msg_size, msg);
@@ -137,4 +138,19 @@ char* check_users(struct api_state *api, sqlite3_stmt *stmt){
         printf("message: %s\n", message);
     }
     return message;
+}
+
+void log_out(sqlite3 *db, char *username) {
+    char *err_msg = 0;
+    char *sql_stmt = malloc( (50 + strlen(username)) * sizeof(char));
+    sprintf(sql_stmt, "UPDATE Users SET status = 0 WHERE username = '%s'", username);
+    int rc;
+
+    rc = sqlite3_exec(db, sql_stmt, 0, 0, &err_msg);
+    if (rc != SQLITE_OK ) {
+        printf("error: %s\n", sqlite3_errmsg(db));
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+    }
+    sleep(0.5);
 }

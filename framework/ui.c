@@ -42,7 +42,6 @@ void ui_state_fill(char *line, struct ui_state *state){
   // fill ui state
   state->command = command;
   state->msg = msg;
-
   // we check if strchr returned NULL
   state->msg_size = (msg - 1) ? strlen(msg) + 1 : 0;
 }
@@ -50,12 +49,19 @@ void ui_state_fill(char *line, struct ui_state *state){
 //counts the number of args of a command
 int arg_count(char *line){
     int i = 0;
-    int arg = 1;
-
+    int arg;
+    if(line[0]==' ' || line[0]=='\t'){
+      arg = 0;
+    } else {
+      arg = 1;
+    }
+    
+    char prevchar = 'a';
     while(line[i]!='\0'){
-      if(line[i]==' ' || line[i]=='\n' || line[i]=='\t'){
+      if((line[i]==' ' || line[i]=='\t') && prevchar!=' ' && prevchar!='\t'){
           arg++;
       }
+      prevchar = line[i];
       i++;
     }
     return arg;
@@ -70,8 +76,8 @@ enum COMMANDS ui_command_parse(struct ui_state *state){
     if(state->msg[0] == '@') command = C_PRIVMSG;
     else command = C_PUBMSG;
   }
-  else if(strcmp(state->command, "/exit\n") == 0){
-    if(arg_count(state->msg) != 1) return C_INVALID;
+  else if(strcmp(state->command, "/exit") == 0){
+    if(!state->msg) command = C_INVALID;
     else command = C_EXIT;
   }
   else if(strcmp(state->command, "/register") == 0){
@@ -79,11 +85,12 @@ enum COMMANDS ui_command_parse(struct ui_state *state){
     else command = C_INVALID;
   }
   else if(strcmp(state->command, "/login") == 0){
+    printf("%d\n",arg_count(state->msg));
     if(arg_count(state->msg) == 2) command = C_LOGIN;
     else command = C_INVALID;
   }
   else if(strcmp(state->command, "/users") == 0){
-    if(arg_count(state->msg) != 1) return C_INVALID;
+    if(!state->msg) command = C_INVALID;
     else command = C_USERS;
   }
   else command = C_UNKNOWN;

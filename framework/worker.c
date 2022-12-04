@@ -107,12 +107,12 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-
+  printf("%d de command\n", msg->code.command);
   //TODO handle different requests
   switch (msg->code.command) {
     case C_PRIVMSG: {
       if(!state->curruser){
-        reply_msg(&state->api, 32, "User is not currently logged in", R_INVALID);
+        reply_msg(&state->api, 39, "error: command not currently available", R_INVALID);
         break;
       }
       sqlite3_stmt *stmt;
@@ -159,7 +159,7 @@ static int execute_request(
         reply_msg(&state->api, 40, "error: command not currently available", R_PUBMSG);
         break;
       }
-
+      printf("message: %s\n", msg->msg);
       char *sql_stmt = (char*)malloc((72 * sizeof(char)) + msg->msg_size);
       // using 0 as receiver field to mark a public message, we can change this later 
       sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \'\', \'%s\')", state->curruser, msg->msg);
@@ -228,6 +228,7 @@ static int execute_request(
         reply_msg(&state->api, 40, "error: command not currently available", R_USERS);
         break;
       }
+      printf("in users switch case\n");
       sqlite3_stmt *stmt;
       char *sql_stmt = (char*)malloc(42 * sizeof(char));
       sprintf(sql_stmt, "SELECT username FROM Users WHERE status=1");
@@ -242,7 +243,7 @@ static int execute_request(
       sqlite3_finalize(stmt);
       break;
     }
-    default: {
+    case C_LOGIN: {
       if(state->curruser){
         reply_msg(&state->api, 40, "error: command not currently available", R_LOGIN);
         break;
@@ -266,7 +267,7 @@ static int execute_request(
         if(strcmp(password, (char*)sqlite3_column_text(stmt, 0)) == 0){
           reply_msg(&state->api, 26, "authentication succeeded", R_LOGIN);
           state->curruser = username; //update current user of this worker
-          sql_stmt = realloc(sql_stmt, (47 + 8) * sizeof(char)); //username length max 8, see pdf
+          sql_stmt = realloc(sql_stmt, (46 + 8) * sizeof(char)); //username length max 8, see pdf
           sprintf(sql_stmt, "UPDATE Users SET status=1 WHERE username=\'%s\'", username); // update database to show user as logged in
           if(exec_query(state->db, sql_stmt) < 0){
             free(sql_stmt);
@@ -281,6 +282,12 @@ static int execute_request(
       free(sql_stmt);
       sqlite3_finalize(stmt);
       break;
+    }
+    default:{
+      if(state->curruser != NULL){
+        log_out(state->db, state->curruser);
+      }
+      return -1;
     }
   }
   
@@ -429,8 +436,12 @@ static void worker_state_free(
   /* TODO any additional worker state cleanup */
 
   /* clean up API state */
+  if(state->curruser != NULL){
+    log_out(state->db, state->curruser);
+  }
   api_state_free(&state->api);
 
+  
   /* close file descriptors */
   close(state->server_fd);
   close(state->api.fd);
