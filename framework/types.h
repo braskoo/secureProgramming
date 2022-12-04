@@ -26,7 +26,8 @@ enum REPLIES{
   R_PUBMSG,
   R_LOGIN,
   R_REGISTER,
-  R_INVALID
+  R_INVALID,
+  R_USERS
 };
 
 union CODE{

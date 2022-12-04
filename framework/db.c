@@ -86,27 +86,23 @@ int exec_query(sqlite3 *db, char *sql_stmt) {
 
 void load_msgs(struct api_state *api, sqlite3_stmt *stmt){
     int length = 0; 
-    const unsigned char *time, *message, *sender, *receiver;
-    char* msg = malloc(0);
+    char *message;
+    
     union CODE code = {C_PUBMSG};
     struct api_msg* notifs;
 
     while(sqlite3_step(stmt) == SQLITE_ROW){
-        length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + sqlite3_column_bytes(stmt,3) + 4;
-        sender = sqlite3_column_text(stmt, 0);
-        receiver = sqlite3_column_text(stmt, 1);
-        time = sqlite3_column_text(stmt, 2);
-        message = sqlite3_column_text(stmt, 3);
-        msg = realloc(msg, length+6);
-        int msg_size = sprintf(msg, "%s %s:%s %s", time, sender, receiver, message) + 1;
-
-        notifs = api_msg_compose(code, msg_size, msg);
+        length = sqlite3_column_bytes(stmt, 0) + 1;
+        message = realloc(message, length);
+        memccpy(message, sqlite3_column_text(stmt, 0), '\0', length);
+    
+        notifs = api_msg_compose(code, length, message);
         api_send(api, notifs);
 
-        sleep(0.1);
+        sleep(0.2);
         free(notifs);
     }
-    free(msg);
+    free(message);
 }
 
 void load_users(struct api_state *api, sqlite3_stmt *stmt){
