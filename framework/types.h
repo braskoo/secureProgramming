@@ -15,7 +15,8 @@ enum COMMANDS{
   C_REGISTER,
   C_USERS,
   C_LOGIN,
-  C_EXIT
+  C_EXIT,
+  C_UNKNOWN
 };
 
 enum REPLIES{

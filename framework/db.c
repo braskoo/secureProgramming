@@ -126,3 +126,15 @@ void load_users(struct api_state *api, sqlite3_stmt *stmt){
     }
     free(msg);
 }
+
+char* check_users(struct api_state *api, sqlite3_stmt *stmt){
+    int length = 0; 
+    char *message = NULL;
+    if(sqlite3_step(stmt) == SQLITE_ROW){
+        length = sqlite3_column_bytes(stmt, 0) + 1;
+        message = realloc(message, length);
+        memccpy(message, sqlite3_column_text(stmt, 0), '\0', length);
+        printf("message: %s\n", message);
+    }
+    return message;
+}

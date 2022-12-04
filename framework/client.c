@@ -74,7 +74,13 @@ static int client_process_command(struct client_state *state) {
   }
 
   if(command == C_INVALID){
-    printf("invalid command, please try again\n");
+    printf("error: invalid command format");
+    ret = 0;
+    goto cleanup;
+  }
+
+  if(command == C_UNKNOWN){
+    printf("error: unknown command %s", state->ui.command);
     ret = 0;
     goto cleanup;
   }

@@ -115,21 +115,41 @@ static int execute_request(
         reply_msg(&state->api, 32, "User is not currently logged in", R_INVALID);
         break;
       }
-      char *sql_stmt = (char*)malloc((75 + 8 + 8) * sizeof(char) + msg->msg_size); //added space for curruser, sender and receiver
+      sqlite3_stmt *stmt;
+      
       char *buf = (char*)malloc(msg->msg_size);
       memcpy(buf, msg->msg, msg->msg_size);
-      char *msg = strchr(buf, ' ') + 1;
+      char *privmsg = strchr(buf, ' ') + 1;
       char *receiver = strtok(buf, " ");
 
-      sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \' %s\', \'%s\')", state->curruser, 
-              receiver, msg);
-      
-      if(exec_query(state->db, sql_stmt) < 0){
+      char* sql_stmt = (char*)malloc( (47 + 8) * sizeof(char) ); 
+      sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", receiver+1);
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
         free(sql_stmt);
+        free(buf);
+        sqlite3_finalize(stmt);
         return -1;
       }
 
+      if(!check_users(&state->api, stmt)){
+        reply_msg(&state->api, 23, "error: user not found", R_INVALID);
+        break;
+      }
+
+      sql_stmt = realloc(sql_stmt, (75 + 8 + 8) * sizeof(char) + msg->msg_size); //added space for curruser, sender and receiver
+      sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \' %s\', \'%s\')", state->curruser, 
+              receiver, privmsg);
+      
+      if(exec_query(state->db, sql_stmt) < 0){
+        free(buf);
+        free(sql_stmt);
+        sqlite3_finalize(stmt);
+        return -1;
+      }
+
+      free(buf);
       free(sql_stmt);
+      sqlite3_finalize(stmt);
       notify_workers(state);
       //send_ack(state->api);
       break;
@@ -157,7 +177,6 @@ static int execute_request(
       break;
     }
     case C_REGISTER: {
-      printf("processing register?\n");
       if(state->curruser){
         reply_msg(&state->api, 40, "error: command not currently available", R_REGISTER);
         break;
@@ -167,29 +186,53 @@ static int execute_request(
       memcpy(buf, msg->msg, msg->msg_size);
       char *username = strtok(buf, " ");
       char *password = strtok(NULL, " ");
-      char *sql_stmt = (char*)malloc((71 * sizeof(char)) + msg->msg_size);
+      
+      sqlite3_stmt *stmt;
+      char *sql_stmt = (char*)malloc((47 + 8) * sizeof(char));
+      sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", username);
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        free(sql_stmt);
+        sqlite3_finalize(stmt);
+        return -1;
+      }
+      
+      char *checked_user = check_users(&state->api, stmt);
+      if(checked_user && strcmp(checked_user, username) == 0){
+        
+        int msg_size = 30 + strlen(username);
+        char* message = (char*)malloc( (strlen(username) + 30) * sizeof(char));
+        sprintf(message, "error: user %s already exists", username);
+        reply_msg(&state->api, msg_size + 1, message, R_INVALID);
+        free(checked_user);
+        goto cleanup;
+        
+      }
+      sql_stmt = realloc(sql_stmt, (71 * sizeof(char)) + msg->msg_size);
       sprintf(sql_stmt, "INSERT INTO Users (username, password, status) VALUES(\'%s\', \'%s\', \'1\')", username, password);
       // worker_split_string(msg->msg, &buf);
       if(exec_query(state->db, sql_stmt) < 0){
         free(sql_stmt);
         return -1;
       }
-      reply_msg(&state->api, 23, "registration succeeded", R_REGISTER);
+      reply_msg(&state->api, 24, "registration succeeded", R_REGISTER);
       state->curruser = username;
       get_chat_history(state);
+
+      cleanup:
+      sqlite3_finalize(stmt);
       free(sql_stmt);
-      // TODO handle register
       break;
     }
     case C_USERS: {
       if(!state->curruser){
-        reply_msg(&state->api, 32, "User is not currently logged in", R_USERS);
+        reply_msg(&state->api, 40, "error: command not currently available", R_USERS);
         break;
       }
       sqlite3_stmt *stmt;
       char *sql_stmt = (char*)malloc(42 * sizeof(char));
       sprintf(sql_stmt, "SELECT username FROM Users WHERE status=1");
       if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        sqlite3_finalize(stmt);
         free(sql_stmt);
         return -1;
       }
@@ -218,7 +261,7 @@ static int execute_request(
       }
 
       if(sqlite3_step(stmt) != SQLITE_ROW){
-        reply_msg(&state->api, 48, "There does not exist a user with that username", R_LOGIN);
+        reply_msg(&state->api, 28, "error: invalid credentials", R_LOGIN);
       } else {
         if(strcmp(password, (char*)sqlite3_column_text(stmt, 0)) == 0){
           reply_msg(&state->api, 26, "authentication succeeded", R_LOGIN);
@@ -232,7 +275,7 @@ static int execute_request(
           printf("hij komt hier wel\n");
           get_chat_history(state);
         } else {
-          reply_msg(&state->api, 40, "The password you entered is incorrect\n", R_LOGIN);
+          reply_msg(&state->api, 28, "error: invalid credentials", R_LOGIN);
         }
       }
       free(sql_stmt);

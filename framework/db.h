@@ -9,6 +9,6 @@ int initialize_db(sqlite3 **db);
 int exec_query(sqlite3 *db, char *sql_stmt);
 void load_msgs(struct api_state *api, sqlite3_stmt *stmt);
 void load_users(struct api_state *api, sqlite3_stmt *stmt);
-
+char* check_users(struct api_state *api, sqlite3_stmt *stmt);
 
 #endif /* defined(_UI_H_) */
