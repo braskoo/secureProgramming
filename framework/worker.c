@@ -54,12 +54,10 @@ static int handle_s2w_notification(struct worker_state *state) {
 void get_chat_history(struct worker_state *state){
   
   char *sql_stmt = (char*)malloc( (134 + 8 + 8) *sizeof(char)); // 82 is the length of the sql statement, 8 is the length of the username
-  printf("hier ook\n");
   sprintf(sql_stmt, 
         "SELECT time || ' ' || sender || ':' || receiver || ' ' || message FROM Messages WHERE (receiver='' OR receiver=\' @%s\' OR sender=\'%s\')", 
         state->curruser, state->curruser);
   sqlite3_stmt *stmt;
-  printf("hier niet %s\n", sql_stmt);
   if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
     return;
   }
@@ -151,7 +149,6 @@ static int execute_request(
       free(sql_stmt);
       sqlite3_finalize(stmt);
       notify_workers(state);
-      //send_ack(state->api);
       break;
     }
     case C_PUBMSG: {
@@ -159,13 +156,9 @@ static int execute_request(
         reply_msg(&state->api, 40, "error: command not currently available", R_PUBMSG);
         break;
       }
-      printf("message: %s\n", msg->msg);
       char *sql_stmt = (char*)malloc((72 * sizeof(char)) + msg->msg_size);
-      // using 0 as receiver field to mark a public message, we can change this later 
       sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \'\', \'%s\')", state->curruser, msg->msg);
       
-      //Missing error handling for exec
-
       if(exec_query(state->db, sql_stmt) < 0){
         free(sql_stmt);
         return -1;
@@ -173,7 +166,6 @@ static int execute_request(
 
       free(sql_stmt);
       notify_workers(state);
-      //send_ack(state->api);
       break;
     }
     case C_REGISTER: {
@@ -181,7 +173,6 @@ static int execute_request(
         reply_msg(&state->api, 40, "error: command not currently available", R_REGISTER);
         break;
       }
-      // struct string_pair buf;
       char *buf = (char*)malloc(msg->msg_size);
       memcpy(buf, msg->msg, msg->msg_size);
       char *username = strtok(buf, " ");
@@ -192,28 +183,28 @@ static int execute_request(
       sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", username);
       if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
         free(sql_stmt);
+        free(buf);
         sqlite3_finalize(stmt);
         return -1;
       }
       
       char *checked_user = check_users(&state->api, stmt);
-      if(checked_user && strcmp(checked_user, username) == 0){
-        
+      if(checked_user && strcmp(checked_user, username) == 0){ //check if user already exists
         int msg_size = 30 + strlen(username);
         char* message = (char*)malloc( (strlen(username) + 30) * sizeof(char));
         sprintf(message, "error: user %s already exists", username);
         reply_msg(&state->api, msg_size + 1, message, R_INVALID);
         free(checked_user);
         goto cleanup;
-        
       }
+
       sql_stmt = realloc(sql_stmt, (71 * sizeof(char)) + msg->msg_size);
       sprintf(sql_stmt, "INSERT INTO Users (username, password, status) VALUES(\'%s\', \'%s\', \'1\')", username, password);
-      // worker_split_string(msg->msg, &buf);
       if(exec_query(state->db, sql_stmt) < 0){
         free(sql_stmt);
         return -1;
       }
+
       reply_msg(&state->api, 24, "registration succeeded", R_REGISTER);
       state->curruser = username;
       get_chat_history(state);
@@ -228,7 +219,6 @@ static int execute_request(
         reply_msg(&state->api, 40, "error: command not currently available", R_USERS);
         break;
       }
-      printf("in users switch case\n");
       sqlite3_stmt *stmt;
       char *sql_stmt = (char*)malloc(42 * sizeof(char));
       sprintf(sql_stmt, "SELECT username FROM Users WHERE status=1");
@@ -258,6 +248,7 @@ static int execute_request(
       sqlite3_stmt *stmt;
       if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
         free(sql_stmt);
+        free(buf);
         return -1;
       }
 
@@ -273,7 +264,6 @@ static int execute_request(
             free(sql_stmt);
             return -1;
           }
-          printf("hij komt hier wel\n");
           get_chat_history(state);
         } else {
           reply_msg(&state->api, 28, "error: invalid credentials", R_LOGIN);

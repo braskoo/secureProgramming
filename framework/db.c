@@ -116,7 +116,6 @@ void load_users(struct api_state *api, sqlite3_stmt *stmt){
         length = sqlite3_column_bytes(stmt, 0) + 1;
         user = sqlite3_column_text(stmt, 0);
         msg = realloc(msg, length+1);
-        printf("hij is hier\n");
         int msg_size = sprintf(msg, "%s", user) + 1;
 
         userlist = api_msg_compose(code, msg_size, msg);
@@ -135,7 +134,6 @@ char* check_users(struct api_state *api, sqlite3_stmt *stmt){
         length = sqlite3_column_bytes(stmt, 0) + 1;
         message = realloc(message, length);
         memccpy(message, sqlite3_column_text(stmt, 0), '\0', length);
-        printf("message: %s\n", message);
     }
     return message;
 }
