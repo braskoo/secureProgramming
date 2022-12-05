@@ -17,9 +17,8 @@ struct worker_state {
   int eof;
   int server_fd;  /* server <-> worker bidirectional notification channel */
   int server_eof;
-  int worker_idx;
+  char *curruser;
   sqlite3 *db;
-
   /* TODO worker state variables go here */
 };
 
@@ -37,65 +36,34 @@ void send_ack(struct api_state state){
 static int handle_s2w_notification(struct worker_state *state) {
   /* TODO implement the function */
  
-  int length = 0; 
-  const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT sender, time, message FROM Messages ORDER BY Time DESC LIMIT 1";
+  
+  char *sql_stmt = (char*)malloc( (159 + 8 + 8) * sizeof(char) ); // 109 is the max length of a message, 8 is the max length of a username
+  sprintf(sql_stmt, 
+          "SELECT time || ' ' || sender || ':' || receiver || ' ' || message FROM Messages WHERE receiver='' OR receiver=\' @%s\' OR sender=\'%s\' ORDER BY Time DESC LIMIT 1",
+          state->curruser, state->curruser);
   sqlite3_stmt *stmt;
 
-  if(prepare_db(state->db, select_last, &stmt) < 0) {
+  if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
     return -1;
   }
-
-  if(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2) + 3;
-    sender = sqlite3_column_text(stmt, 0);
-    time = sqlite3_column_text(stmt, 1);
-    message = sqlite3_column_text(stmt, 2);
-  }
-  
-  char* msg = malloc(length+7);
-  int msg_size = sprintf(msg, "%s %s: %s", time, sender, message) + 1; // null terminator
-  
-  union CODE code = {R_PUBMSG};
-
-  struct api_msg* notifs = api_msg_compose(code, msg_size, msg);
-  api_send(&state->api, notifs);
-
-  free(msg);
-  free(notifs);
+  load_msgs(&state->api, stmt);
   sqlite3_finalize(stmt);
   return 0;
 }
 
 void get_chat_history(struct worker_state *state){
-  int length = 0; 
-  const unsigned char *time, *message, *sender;
-  char *select_last = "SELECT sender, time, message FROM Messages";
+  
+  char *sql_stmt = (char*)malloc( (134 + 8 + 8) *sizeof(char)); // 82 is the length of the sql statement, 8 is the length of the username
+  printf("hier ook\n");
+  sprintf(sql_stmt, 
+        "SELECT time || ' ' || sender || ':' || receiver || ' ' || message FROM Messages WHERE (receiver='' OR receiver=\' @%s\' OR sender=\'%s\')", 
+        state->curruser, state->curruser);
   sqlite3_stmt *stmt;
-
-  if(prepare_db(state->db, select_last, &stmt) < 0) {
+  printf("hier niet %s\n", sql_stmt);
+  if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
     return;
   }
-  char* msg = malloc(0);
-  union CODE code = {C_PUBMSG};
-  struct api_msg* notifs;
-
-  while(sqlite3_step(stmt) == SQLITE_ROW){
-    length = sqlite3_column_bytes(stmt, 0) + sqlite3_column_bytes(stmt, 1) + sqlite3_column_bytes(stmt, 2)+3;
-    sender = sqlite3_column_text(stmt, 0);
-    time = sqlite3_column_text(stmt, 1);
-    message = sqlite3_column_text(stmt, 2);
-    msg = realloc(msg, length+7);
-    int msg_size = sprintf(msg, "%s %s: %s", time, sender, message) + 1;
-    printf("msg: %s\n", message);
-    notifs = api_msg_compose(code, msg_size, msg);
-    printf("%ld: %s\n", notifs->msg_size, notifs->msg);
-    api_send(&state->api, notifs);
-
-    sleep(0.1);
-    free(notifs);
-  }
-  free(msg);
+  load_msgs(&state->api, stmt);
   sqlite3_finalize(stmt);
 }
 
@@ -122,17 +90,12 @@ static int notify_workers(struct worker_state *state) {
   return 0;
 }
 
-int callback(void *NotUsed, int argc, char **argv, 
-                    char **azColName) {
-    
-    NotUsed = 0;
-    
-    for (int i = 0; i < argc; i++) {
+void reply_msg (struct api_state *api, int msg_size, char *msg, enum REPLIES reply_code){
 
-        printf("%s\n", argv[i] ? argv[i] : "NULL");
-    }
-    
-    return 0;
+  union CODE code = {reply_code};
+  struct api_msg *reply = api_msg_compose(code, msg_size * sizeof(char), msg);
+  api_send(api, reply);
+  free(reply);
 }
 
 /**
@@ -144,63 +107,188 @@ static int execute_request(
   struct worker_state *state,
   const struct api_msg *msg) {
 
-
+  printf("%d de command\n", msg->code.command);
   //TODO handle different requests
   switch (msg->code.command) {
     case C_PRIVMSG: {
-      // TODO handle private message
-      // char *sql_insert = (char*)malloc(1200 * sizeof(char));
-      // sprintf(sql_insert, "INSERT INTO Messages (Sender, Receiver, Message) VALUES(\'%d\', \'%s\', \'%s\')", state->worker_idx, msg->username, msg->msg);
-      // if(exec_query(state->db, sql_insert) < 0){
-      //   free(sql_insert);
-      //   return -1;
-      // }
-      // free(sql_insert);
-      // notify_workers(state);
+      if(!state->curruser){
+        reply_msg(&state->api, 39, "error: command not currently available", R_INVALID);
+        break;
+      }
+      sqlite3_stmt *stmt;
+      
+      char *buf = (char*)malloc(msg->msg_size);
+      memcpy(buf, msg->msg, msg->msg_size);
+      char *privmsg = strchr(buf, ' ') + 1;
+      char *receiver = strtok(buf, " ");
+
+      char* sql_stmt = (char*)malloc( (47 + 8) * sizeof(char) ); 
+      sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", receiver+1);
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        free(sql_stmt);
+        free(buf);
+        sqlite3_finalize(stmt);
+        return -1;
+      }
+
+      if(!check_users(&state->api, stmt)){
+        reply_msg(&state->api, 23, "error: user not found", R_INVALID);
+        break;
+      }
+
+      sql_stmt = realloc(sql_stmt, (75 + 8 + 8) * sizeof(char) + msg->msg_size); //added space for curruser, sender and receiver
+      sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \' %s\', \'%s\')", state->curruser, 
+              receiver, privmsg);
+      
+      if(exec_query(state->db, sql_stmt) < 0){
+        free(buf);
+        free(sql_stmt);
+        sqlite3_finalize(stmt);
+        return -1;
+      }
+
+      free(buf);
+      free(sql_stmt);
+      sqlite3_finalize(stmt);
+      notify_workers(state);
+      //send_ack(state->api);
       break;
     }
     case C_PUBMSG: {
-      char *sql_insert = (char*)malloc((75 * sizeof(char)) + msg->msg_size);
+      if(!state->curruser){
+        reply_msg(&state->api, 40, "error: command not currently available", R_PUBMSG);
+        break;
+      }
+      printf("message: %s\n", msg->msg);
+      char *sql_stmt = (char*)malloc((72 * sizeof(char)) + msg->msg_size);
       // using 0 as receiver field to mark a public message, we can change this later 
-      printf("in pubmsg: %s\n", msg->msg);
-      sprintf(sql_insert, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%d\', \'all\', \'%s\')", state->worker_idx, msg->msg);
+      sprintf(sql_stmt, "INSERT INTO Messages (sender, receiver, message) VALUES(\'%s\', \'\', \'%s\')", state->curruser, msg->msg);
       
       //Missing error handling for exec
-      printf("query: %s\n", sql_insert);
 
-      if(exec_query(state->db, sql_insert) < 0){
-        free(sql_insert);
+      if(exec_query(state->db, sql_stmt) < 0){
+        free(sql_stmt);
         return -1;
       }
 
-      free(sql_insert);
+      free(sql_stmt);
       notify_workers(state);
-      send_ack(state->api);
+      //send_ack(state->api);
       break;
     }
     case C_REGISTER: {
-      printf("processing register?\n");
+      if(state->curruser){
+        reply_msg(&state->api, 40, "error: command not currently available", R_REGISTER);
+        break;
+      }
       // struct string_pair buf;
-
+      char *buf = (char*)malloc(msg->msg_size);
+      memcpy(buf, msg->msg, msg->msg_size);
+      char *username = strtok(buf, " ");
+      char *password = strtok(NULL, " ");
+      
+      sqlite3_stmt *stmt;
+      char *sql_stmt = (char*)malloc((47 + 8) * sizeof(char));
+      sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", username);
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        free(sql_stmt);
+        sqlite3_finalize(stmt);
+        return -1;
+      }
+      
+      char *checked_user = check_users(&state->api, stmt);
+      if(checked_user && strcmp(checked_user, username) == 0){
+        
+        int msg_size = 30 + strlen(username);
+        char* message = (char*)malloc( (strlen(username) + 30) * sizeof(char));
+        sprintf(message, "error: user %s already exists", username);
+        reply_msg(&state->api, msg_size + 1, message, R_INVALID);
+        free(checked_user);
+        goto cleanup;
+        
+      }
+      sql_stmt = realloc(sql_stmt, (71 * sizeof(char)) + msg->msg_size);
+      sprintf(sql_stmt, "INSERT INTO Users (username, password, status) VALUES(\'%s\', \'%s\', \'1\')", username, password);
       // worker_split_string(msg->msg, &buf);
+      if(exec_query(state->db, sql_stmt) < 0){
+        free(sql_stmt);
+        return -1;
+      }
+      reply_msg(&state->api, 24, "registration succeeded", R_REGISTER);
+      state->curruser = username;
+      get_chat_history(state);
 
-      // TODO handle register
+      cleanup:
+      sqlite3_finalize(stmt);
+      free(sql_stmt);
       break;
     }
     case C_USERS: {
-      send(state->api.fd, "0THERE ARE NO USERS YET", 24, 0);
-      char *sql_select = (char*)malloc(1200 * sizeof(char));
-      sprintf(sql_select, "SELECT username FROM Users");
-      if(exec_query(state->db, sql_select) < 0){
-        free(sql_select);
+      if(!state->curruser){
+        reply_msg(&state->api, 40, "error: command not currently available", R_USERS);
+        break;
+      }
+      printf("in users switch case\n");
+      sqlite3_stmt *stmt;
+      char *sql_stmt = (char*)malloc(42 * sizeof(char));
+      sprintf(sql_stmt, "SELECT username FROM Users WHERE status=1");
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        sqlite3_finalize(stmt);
+        free(sql_stmt);
         return -1;
       }
-      free(sql_select);
+      load_users(&state->api, stmt);
+      
+      free(sql_stmt);
+      sqlite3_finalize(stmt);
       break;
     }
-    default: 
-      send(state->api.fd, "0YOU CANT LOGIN YET", 20, 0);
+    case C_LOGIN: {
+      if(state->curruser){
+        reply_msg(&state->api, 40, "error: command not currently available", R_LOGIN);
+        break;
+      }
+      
+      char *buf = (char*)malloc(msg->msg_size);
+      memcpy(buf, msg->msg, msg->msg_size);
+      char *username = strtok(buf, " ");
+      char *password = strtok(NULL, " ");
+      char *sql_stmt = (char*)malloc( (48 + 8) * sizeof(char));
+      sprintf(sql_stmt, "SELECT password FROM Users WHERE username=\'%s\'", username);
+      sqlite3_stmt *stmt;
+      if(prepare_db(state->db, sql_stmt, &stmt) < 0) {
+        free(sql_stmt);
+        return -1;
+      }
+
+      if(sqlite3_step(stmt) != SQLITE_ROW){
+        reply_msg(&state->api, 28, "error: invalid credentials", R_LOGIN);
+      } else {
+        if(strcmp(password, (char*)sqlite3_column_text(stmt, 0)) == 0){
+          reply_msg(&state->api, 26, "authentication succeeded", R_LOGIN);
+          state->curruser = username; //update current user of this worker
+          sql_stmt = realloc(sql_stmt, (46 + 8) * sizeof(char)); //username length max 8, see pdf
+          sprintf(sql_stmt, "UPDATE Users SET status=1 WHERE username=\'%s\'", username); // update database to show user as logged in
+          if(exec_query(state->db, sql_stmt) < 0){
+            free(sql_stmt);
+            return -1;
+          }
+          printf("hij komt hier wel\n");
+          get_chat_history(state);
+        } else {
+          reply_msg(&state->api, 28, "error: invalid credentials", R_LOGIN);
+        }
+      }
+      free(sql_stmt);
+      sqlite3_finalize(stmt);
       break;
+    }
+    default:{
+      if(state->curruser != NULL){
+        log_out(state->db, state->curruser);
+      }
+      return -1;
+    }
   }
   
 
@@ -320,7 +408,7 @@ static int worker_state_init(
   /* initialize */
   memset(state, 0, sizeof(*state));
   state->server_fd = server_fd;
-
+  state->curruser = NULL;
   /* set up API state */
   api_state_init(&state->api, connfd);
 
@@ -348,8 +436,12 @@ static void worker_state_free(
   /* TODO any additional worker state cleanup */
 
   /* clean up API state */
+  if(state->curruser != NULL){
+    log_out(state->db, state->curruser);
+  }
   api_state_free(&state->api);
 
+  
   /* close file descriptors */
   close(state->server_fd);
   close(state->api.fd);
@@ -378,7 +470,7 @@ void worker_start(
     goto cleanup;
   }
   /* TODO any additional worker initialization */
-  get_chat_history(&state);
+
   /* handle for incoming requests */
   while (!state.eof) {
     if (handle_incoming(&state) != 0) {
