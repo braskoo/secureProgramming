@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-void api_debug_msg(const struct api_msg *msg, const char* str);
+void api_debug_msg(const struct api_msg *msg, const char *str);
 
 struct api_msg *api_recv(struct api_state *state);
 struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text);

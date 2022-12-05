@@ -1,12 +1,17 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sqlite3.h>
 
 #include "workerutil.h"
+#include "api.h"
+#include "types.h"
 
-// splits string into two parts UNUSED
-void worker_split_string(const char line[]){
-    char *split_idx = strchr(line, ' ');
-
-    printf("split | first: (%s), second: (%s)\n", line, split_idx + 1);
+void reply_msg(struct api_state *api, int msg_size, char *msg, enum REPLIES reply_code)
+{
+    union CODE code = {reply_code};
+    struct api_msg *reply = api_msg_compose(code, msg_size * sizeof(char), msg);
+    api_send(api, reply);
+    free(reply);
 }
+

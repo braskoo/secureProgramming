@@ -1,6 +1,8 @@
-#ifndef _WORKERUTIL_H_
-#define _WORKERUTIL_H_
+#ifndef _WORKER_COMMANDS_H_
+#define _WORKER_COMMANDS_H_
 
-void worker_split_string(const char line[]);
+#include "types.h"
+
+void reply_msg(struct api_state *api, int msg_size, char *msg, enum REPLIES reply_code);
 
 #endif
