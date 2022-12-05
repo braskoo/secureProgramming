@@ -56,9 +56,9 @@ static int client_process_command(struct client_state *state)
 
   setvbuf(stdout, NULL, _IONBF, 0);
   char *line = NULL;
-  size_t len = 0;
+  size_t len, read = getline(&line, &len, stdin);
 
-  if (getline(&line, &len, stdin) == -1)
+  if (read == -1)
   {
     state->eof = 1;
     free(line);
@@ -66,34 +66,48 @@ static int client_process_command(struct client_state *state)
   }
 
   // null terminate string
-  line[strlen(line) - 1] = '\0';
-  handlespace(line);
+  line[read - 1] = '\0';
   // fill ui state with appropriate information from line and validate input
-  ui_state_fill(line, &state->ui);
+  ui_state_fill(line, read, &state->ui);
 
   enum COMMANDS command = ui_command_parse(&state->ui);
   union CODE code = {command};
 
-  if (command == C_EXIT)
-  {
-    ret = -1;
-    goto cleanup;
-  }
-
-  if (command == C_INVALID)
-  {
-    printf("error: invalid command format\n");
-    ret = 0;
-    goto cleanup;
-  }
-
-  if (command == C_UNKNOWN)
-  {
-    printf("error: unknown command %s\n", state->ui.command);
-    ret = 0;
-    goto cleanup;
-  }
-
+  switch(command){
+    case C_EXIT: {
+      ret = -1;
+      goto cleanup;
+    }
+    case C_INVALID: {
+      printf("error: invalid command format\n");
+      ret = 0;
+      goto cleanup;
+    }
+    case C_UNKNOWN: {
+      printf("error: unknown command %s\n", state->ui.str_arr[0]);
+      ret = 0;
+      goto cleanup;
+    }
+    case C_USERS:
+      state->ui.msg_size = 0;
+      break;
+    case C_LOGIN:
+    case C_REGISTER:{
+      state->ui.msg = malloc(read);
+      state->ui.msg_size = sprintf(state->ui.msg, "%s %s", state->ui.str_arr[1], state->ui.str_arr[2]) + 1; // null terminator
+      break;
+    }
+    case C_PRIVMSG:
+    case C_PUBMSG:{
+      state->ui.msg_size = read;
+      state->ui.msg = strndup(line, read);
+      break;
+    }
+    default: {
+      printf("wait how did you get here you fkn wizard\n");
+    }
+  }  
+  
   struct api_msg *request = api_msg_compose(code, state->ui.msg_size, state->ui.msg);
   ssize_t sent = api_send(&state->api, request);
 
@@ -108,6 +122,7 @@ static int client_process_command(struct client_state *state)
   free(request);
 
 cleanup:
+  ui_state_free(&(state->ui));
   free(line);
   return ret;
 }
@@ -136,7 +151,7 @@ static int handle_server_request(struct client_state *state)
 
   struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
-  r = msg->code.command;
+  r = msg->code.reply;
   if (r < 0)
     return -1;
   if (r == 0)
@@ -228,7 +243,7 @@ static void client_state_free(struct client_state *state)
   api_state_free(&state->api);
 
   /* cleanup UI state */
-  ui_state_free(&state->ui);
+  //free(&state->ui.str_arr);
 }
 
 static void usage(void)

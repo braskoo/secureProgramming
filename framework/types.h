@@ -56,8 +56,9 @@ struct api_msg
 
 struct ui_state
 {
-  char *command;
   ssize_t msg_size;
+  char **str_arr;
+  int argc;
   char *msg;
 };
 

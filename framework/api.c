@@ -49,7 +49,7 @@ struct api_msg *api_recv(struct api_state *state)
     msg->msg_size = recieved - sizeof(struct api_msg);
   }
 
-  api_debug_msg(msg, "RECV");
+  //api_debug_msg(msg, "RECV");
 
   return msg;
 }
@@ -57,7 +57,7 @@ struct api_msg *api_recv(struct api_state *state)
 // size has to include null terminator
 struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text)
 {
-  assert(text);
+  
 
   struct api_msg *msg = malloc(size + sizeof(struct api_msg));
 
@@ -101,7 +101,7 @@ void api_state_init(struct api_state *state, int fd)
 
 ssize_t api_send(struct api_state *api, const struct api_msg *request)
 {
-  api_debug_msg(request, "SEND");
+  //api_debug_msg(request, "SEND");
 
   ssize_t sent = send(api->fd, request, request->msg_size + sizeof(struct api_msg), MSG_DONTWAIT);
 

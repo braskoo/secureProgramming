@@ -305,227 +305,228 @@ static int execute_request(struct worker_state *state, const struct api_msg *msg
   }
   case C_LOGIN:
   {
-    worker_handle_login(state, msg);
+    return worker_handle_login(state, msg);
   }
   default:
     return -1;
   }
 }
 
-  /**
-   * @brief         Reads an incoming request from the client and handles it.
-   * @param state   Initialized worker state
-   */
-  static int handle_client_request(struct worker_state * state)
+/**
+ * @brief         Reads an incoming request from the client and handles it.
+ * @param state   Initialized worker state
+ */
+static int handle_client_request(struct worker_state *state)
+{
+  int r, success = 1;
+  assert(state);
+
+  struct api_msg *msg = api_recv(&state->api);
+  /* wait for incoming request, set eof if there are no more requests */
+  r = msg->code.command;
+  if (r == R_SOCKERR)
+    return -1;
+  if (r == R_SOCKCLOSED)
   {
-    int r, success = 1;
-    assert(state);
-
-    struct api_msg *msg = api_recv(&state->api);
-    /* wait for incoming request, set eof if there are no more requests */
-    r = msg->code.command;
-    if (r == R_SOCKERR)
-      return -1;
-    if (r == R_SOCKCLOSED)
-    {
-      if (state->curruser)
-      {
-        log_out(state->db, state->curruser);
-      }
-      state->eof = 1;
-      return 0;
-    }
-
-    /* execute request */
-    if (execute_request(state, msg) != 0)
-    {
-      success = 0;
-    }
-
-    /* clean up state associated with the message */
-    free(msg);
-
-    return success ? 0 : -1;
-  }
-
-  static int handle_s2w_read(struct worker_state * state)
-  {
-    char buf[256];
-    ssize_t r;
-
-    /* notification from the server that the workers must notify their clients
-     * about new messages; these notifications are idempotent so the number
-     * does not actually matter, nor does the data sent over the pipe
-     */
-    errno = 0;
-    r = read(state->server_fd, buf, sizeof(buf));
-    if (r < 0)
-    {
-      perror("error: read server_fd failed");
-      return -1;
-    }
-    if (r == 0)
-    {
-      state->server_eof = 1;
-      return 0;
-    }
-
-    /* notify our client */
-    if (handle_s2w_notification(state) != 0)
-      return -1;
-
-    return 0;
-  }
-
-  /**
-   * @brief Registers for: client request events, server notification
-   *        events. In case of a client request, it processes the
-   *        request and sends a response to client. In case of a server
-   *        notification it notifies the client of all newly received
-   *        messages.
-   *
-   */
-  static int handle_incoming(struct worker_state * state)
-  {
-    int fdmax, r, success = 1;
-    fd_set readfds;
-
-    assert(state);
-
-    /* list file descriptors to wait for */
-    FD_ZERO(&readfds);
-    /* wake on incoming messages from client */
-    FD_SET(state->api.fd, &readfds);
-    /* wake on incoming server notifications */
-    if (!state->server_eof)
-      FD_SET(state->server_fd, &readfds);
-    fdmax = max(state->api.fd, state->server_fd);
-
-    /* wait for at least one to become ready */
-    r = select(fdmax + 1, &readfds, NULL, NULL, NULL);
-    if (r < 0)
-    {
-      if (errno == EINTR)
-        return 0;
-      perror("error: select failed");
-      return -1;
-    }
-
-    /* handle ready file descriptors */
-    /* TODO once you implement encryption you may need to call ssl_has_data
-     * here due to buffering (see ssl-nonblock example)
-     */
-    if (FD_ISSET(state->api.fd, &readfds))
-    {
-      if (handle_client_request(state) != 0)
-        success = 0;
-    }
-    if (FD_ISSET(state->server_fd, &readfds))
-    {
-      if (handle_s2w_read(state) != 0)
-        success = 0;
-    }
-    return success ? 0 : -1;
-  }
-
-  /**
-   * @brief Initialize struct worker_state before starting processing requests.
-   * @param state        worker state
-   * @param connfd       connection file descriptor
-   * @param pipefd_w2s   pipe to notify server (write something to notify)
-   * @param pipefd_s2w   pipe to be notified by server (can read when notified)
-   *
-   */
-  static int worker_state_init(
-      struct worker_state * state,
-      int connfd,
-      int server_fd,
-      int worker_idx)
-  {
-
-    /* initialize */
-    memset(state, 0, sizeof(*state));
-    state->server_fd = server_fd;
-    state->curruser = NULL;
-    /* set up API state */
-    api_state_init(&state->api, connfd);
-
-    sqlite3 *db;
-
-    int rc = sqlite3_open("chat.db", &db);
-
-    if (rc != SQLITE_OK)
-    {
-      fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
-      sqlite3_close(db);
-
-      return 1;
-    }
-    state->db = db;
-    return 0;
-  }
-
-  /**
-   * @brief Clean up struct worker_state when shutting down.
-   * @param state        worker state
-   *
-   */
-  static void worker_state_free(
-      struct worker_state * state)
-  {
-    /* TODO any additional worker state cleanup */
-
-    /* clean up API state */
-    if (state->curruser != NULL)
+    if (state->curruser)
     {
       log_out(state->db, state->curruser);
+      state->curruser = NULL;
     }
-    api_state_free(&state->api);
-
-    /* close file descriptors */
-    close(state->server_fd);
-    close(state->api.fd);
-    sqlite3_close(state->db);
+    state->eof = 1;
+    return 0;
   }
 
-  /**
-   * @brief              Worker entry point. Called by the server when a
-   *                     worker is spawned.
-   * @param connfd       File descriptor for connection socket
-   * @param pipefd_w2s   File descriptor for pipe to send notifications
-   *                     from worker to server
-   * @param pipefd_s2w   File descriptor for pipe to send notifications
-   *                     from server to worker
-   */
-  __attribute__((noreturn)) void worker_start(
-      int connfd,
-      int server_fd,
-      int worker_idx)
+  /* execute request */
+  if (execute_request(state, msg) != 0)
   {
-    struct worker_state state;
-    int success = 1;
-
-    /* initialize worker state */
-    if (worker_state_init(&state, connfd, server_fd, worker_idx) != 0)
-    {
-      goto cleanup;
-    }
-    /* TODO any additional worker initialization */
-
-    /* handle for incoming requests */
-    while (!state.eof)
-    {
-      if (handle_incoming(&state) != 0)
-      {
-        success = 0;
-        break;
-      }
-    }
-
-  cleanup:
-    /* cleanup worker */
-    /* TODO any additional worker cleanup */
-    worker_state_free(&state);
-
-    exit(success ? 0 : 1);
+    success = 0;
   }
+
+  /* clean up state associated with the message */
+  free(msg);
+
+  return success ? 0 : -1;
+}
+
+static int handle_s2w_read(struct worker_state *state)
+{
+  char buf[256];
+  ssize_t r;
+
+  /* notification from the server that the workers must notify their clients
+   * about new messages; these notifications are idempotent so the number
+   * does not actually matter, nor does the data sent over the pipe
+   */
+  errno = 0;
+  r = read(state->server_fd, buf, sizeof(buf));
+  if (r < 0)
+  {
+    perror("error: read server_fd failed");
+    return -1;
+  }
+  if (r == 0)
+  {
+    state->server_eof = 1;
+    return 0;
+  }
+
+  /* notify our client */
+  if (handle_s2w_notification(state) != 0)
+    return -1;
+
+  return 0;
+}
+
+/**
+ * @brief Registers for: client request events, server notification
+ *        events. In case of a client request, it processes the
+ *        request and sends a response to client. In case of a server
+ *        notification it notifies the client of all newly received
+ *        messages.
+ *
+ */
+static int handle_incoming(struct worker_state *state)
+{
+  int fdmax, r, success = 1;
+  fd_set readfds;
+
+  assert(state);
+
+  /* list file descriptors to wait for */
+  FD_ZERO(&readfds);
+  /* wake on incoming messages from client */
+  FD_SET(state->api.fd, &readfds);
+  /* wake on incoming server notifications */
+  if (!state->server_eof)
+    FD_SET(state->server_fd, &readfds);
+  fdmax = max(state->api.fd, state->server_fd);
+
+  /* wait for at least one to become ready */
+  r = select(fdmax + 1, &readfds, NULL, NULL, NULL);
+  if (r < 0)
+  {
+    if (errno == EINTR)
+      return 0;
+    perror("error: select failed");
+    return -1;
+  }
+
+  /* handle ready file descriptors */
+  /* TODO once you implement encryption you may need to call ssl_has_data
+   * here due to buffering (see ssl-nonblock example)
+   */
+  if (FD_ISSET(state->api.fd, &readfds))
+  {
+    if (handle_client_request(state) != 0)
+      success = 0;
+  }
+  if (FD_ISSET(state->server_fd, &readfds))
+  {
+    if (handle_s2w_read(state) != 0)
+      success = 0;
+  }
+  return success ? 0 : -1;
+}
+
+/**
+ * @brief Initialize struct worker_state before starting processing requests.
+ * @param state        worker state
+ * @param connfd       connection file descriptor
+ * @param pipefd_w2s   pipe to notify server (write something to notify)
+ * @param pipefd_s2w   pipe to be notified by server (can read when notified)
+ *
+ */
+static int worker_state_init(
+    struct worker_state *state,
+    int connfd,
+    int server_fd,
+    int worker_idx)
+{
+
+  /* initialize */
+  memset(state, 0, sizeof(*state));
+  state->server_fd = server_fd;
+  state->curruser = NULL;
+  /* set up API state */
+  api_state_init(&state->api, connfd);
+
+  sqlite3 *db;
+
+  int rc = sqlite3_open("chat.db", &db);
+
+  if (rc != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to open db, %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+
+    return 1;
+  }
+  state->db = db;
+  return 0;
+}
+
+/**
+ * @brief Clean up struct worker_state when shutting down.
+ * @param state        worker state
+ *
+ */
+static void worker_state_free(
+    struct worker_state *state)
+{
+  /* TODO any additional worker state cleanup */
+
+  /* clean up API state */
+  if (state->curruser != NULL)
+  {
+    log_out(state->db, state->curruser);
+  }
+  api_state_free(&state->api);
+
+  /* close file descriptors */
+  close(state->server_fd);
+  close(state->api.fd);
+  sqlite3_close(state->db);
+}
+
+/**
+ * @brief              Worker entry point. Called by the server when a
+ *                     worker is spawned.
+ * @param connfd       File descriptor for connection socket
+ * @param pipefd_w2s   File descriptor for pipe to send notifications
+ *                     from worker to server
+ * @param pipefd_s2w   File descriptor for pipe to send notifications
+ *                     from server to worker
+ */
+__attribute__((noreturn)) void worker_start(
+    int connfd,
+    int server_fd,
+    int worker_idx)
+{
+  struct worker_state state;
+  int success = 1;
+
+  /* initialize worker state */
+  if (worker_state_init(&state, connfd, server_fd, worker_idx) != 0)
+  {
+    goto cleanup;
+  }
+  /* TODO any additional worker initialization */
+
+  /* handle for incoming requests */
+  while (!state.eof)
+  {
+    if (handle_incoming(&state) != 0)
+    {
+      success = 0;
+      break;
+    }
+  }
+
+cleanup:
+  /* cleanup worker */
+  /* TODO any additional worker cleanup */
+  worker_state_free(&state);
+
+  exit(success ? 0 : 1);
+}
