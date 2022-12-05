@@ -57,6 +57,4 @@ struct client_state {
   /* TODO client state variables go here */
 };
 
-
-
 #endif
