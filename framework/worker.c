@@ -441,7 +441,6 @@ static void worker_state_free(
   }
   api_state_free(&state->api);
 
-  
   /* close file descriptors */
   close(state->server_fd);
   close(state->api.fd);
