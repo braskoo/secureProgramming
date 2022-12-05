@@ -14,6 +14,8 @@ int prepare_db(sqlite3 *db, char *sql_stmt, sqlite3_stmt **ppStmt)
     {
         printf("error: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
+        sqlite3_finalize(*ppStmt);
+        free(sql_stmt);
         return -1;
     }
     return 0;
@@ -87,6 +89,7 @@ int exec_query(sqlite3 *db, char *sql_stmt)
         printf("error: %s\n", sqlite3_errmsg(db));
         sqlite3_free(err_msg);
         sqlite3_close(db);
+        free(sql_stmt);
         return -1;
     }
     return 0;

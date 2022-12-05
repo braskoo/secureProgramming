@@ -27,10 +27,7 @@ static int handle_s2w_notification(struct worker_state *state)
           state->curruser, state->curruser);
   sqlite3_stmt *stmt;
 
-  if (prepare_db(state->db, sql_stmt, &stmt) < 0)
-  {
-    return -1;
-  }
+  if (prepare_db(state->db, sql_stmt, &stmt) < 0) return -1;
   load_msgs(&state->api, stmt);
   sqlite3_finalize(stmt);
   return 0;
@@ -46,10 +43,7 @@ void get_chat_history(struct worker_state *state)
           state->curruser, state->curruser);
   sqlite3_stmt *stmt;
   printf("hier niet %s\n", sql_stmt);
-  if (prepare_db(state->db, sql_stmt, &stmt) < 0)
-  {
-    return;
-  }
+  if (prepare_db(state->db, sql_stmt, &stmt) < 0) return;
   load_msgs(&state->api, stmt);
   sqlite3_finalize(stmt);
 }
@@ -79,11 +73,7 @@ __attribute__((unused)) static int notify_workers(struct worker_state *state)
 
 int worker_handle_privmsg(struct worker_state *state, const struct api_msg *msg)
 {
-  if (!state->curruser)
-  {
-    reply_msg(&state->api, 39, "error: command not currently available", R_INVALID);
-    return 0;
-  }
+  if(!logged(&state->api, state->curruser)) return 0;
   sqlite3_stmt *stmt;
 
   char *buf = (char *)malloc(msg->msg_size);
@@ -95,9 +85,7 @@ int worker_handle_privmsg(struct worker_state *state, const struct api_msg *msg)
   sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", receiver + 1);
   if (prepare_db(state->db, sql_stmt, &stmt) < 0)
   {
-    free(sql_stmt);
     free(buf);
-    sqlite3_finalize(stmt);
     return -1;
   }
 
@@ -113,8 +101,6 @@ int worker_handle_privmsg(struct worker_state *state, const struct api_msg *msg)
   if (exec_query(state->db, sql_stmt) < 0)
   {
     free(buf);
-    free(sql_stmt);
-    sqlite3_finalize(stmt);
     return -1;
   }
 
@@ -127,11 +113,7 @@ int worker_handle_privmsg(struct worker_state *state, const struct api_msg *msg)
 
 int worker_handle_pubmsg(struct worker_state *state, const struct api_msg *msg)
 {
-  if (!state->curruser)
-  {
-    reply_msg(&state->api, 40, "error: command not currently available", R_PUBMSG);
-    return 0;
-  }
+  if(!logged(&state->api, state->curruser)) return 0;
   printf("message: %s\n", msg->msg);
   char *sql_stmt = (char *)malloc((72 * sizeof(char)) + msg->msg_size);
   // using 0 as receiver field to mark a public message, we can change this later
@@ -139,11 +121,7 @@ int worker_handle_pubmsg(struct worker_state *state, const struct api_msg *msg)
 
   // Missing error handling for exec
 
-  if (exec_query(state->db, sql_stmt) < 0)
-  {
-    free(sql_stmt);
-    return -1;
-  }
+  if (exec_query(state->db, sql_stmt) < 0) return -1;
 
   free(sql_stmt);
   notify_workers(state);
@@ -152,24 +130,17 @@ int worker_handle_pubmsg(struct worker_state *state, const struct api_msg *msg)
 
 int worker_handle_register(struct worker_state *state, const struct api_msg *msg)
 {
-  if (state->curruser)
-  {
-    reply_msg(&state->api, 39, "error: command not currently available", R_REGISTER);
-    return 0;
-  }
+  if(logged(&state->api, state->curruser)) return 0;
   // struct string_pair buf;
-  char *buf = (char *)malloc(msg->msg_size);
-  memcpy(buf, msg->msg, msg->msg_size);
-  char *username = strtok(buf, " ");
-  char *password = strtok(NULL, " ");
+  char *buf, *username, *password;
+  split_msg(msg->msg, msg->msg_size, &buf, &username, &password);
 
   sqlite3_stmt *stmt;
   char *sql_stmt = (char *)malloc((47 + 8) * sizeof(char));
   sprintf(sql_stmt, "SELECT username FROM Users WHERE username=\'%s\'", username);
-  if (prepare_db(state->db, sql_stmt, &stmt) < 0)
+  if (prepare_db(state->db, sql_stmt, &stmt) < 0) 
   {
-    free(sql_stmt);
-    sqlite3_finalize(stmt);
+    free(buf);
     return -1;
   }
 
@@ -187,9 +158,9 @@ int worker_handle_register(struct worker_state *state, const struct api_msg *msg
   sql_stmt = realloc(sql_stmt, (71 * sizeof(char)) + msg->msg_size);
   sprintf(sql_stmt, "INSERT INTO Users (username, password, status) VALUES(\'%s\', \'%s\', \'1\')", username, password);
   // worker_split_string(msg->msg, &buf);
-  if (exec_query(state->db, sql_stmt) < 0)
+  if (exec_query(state->db, sql_stmt) < 0) 
   {
-    free(sql_stmt);
+    free(buf);
     return -1;
   }
   reply_msg(&state->api, 24, "registration succeeded", R_REGISTER);
@@ -199,26 +170,19 @@ int worker_handle_register(struct worker_state *state, const struct api_msg *msg
 cleanup:
   sqlite3_finalize(stmt);
   free(sql_stmt);
+  free(buf);
   return 0;
 }
 
 int worker_handle_users(struct worker_state *state, const struct api_msg *msg)
 {
-  if (!state->curruser)
-  {
-    reply_msg(&state->api, 40, "error: command not currently available", R_USERS);
-    return 0;
-  }
+  if(!logged(&state->api, state->curruser)) return 0;
   printf("in users switch case\n");
   sqlite3_stmt *stmt;
   char *sql_stmt = (char *)malloc(42 * sizeof(char));
   sprintf(sql_stmt, "SELECT username FROM Users WHERE status=1");
-  if (prepare_db(state->db, sql_stmt, &stmt) < 0)
-  {
-    sqlite3_finalize(stmt);
-    free(sql_stmt);
-    return -1;
-  }
+  if (prepare_db(state->db, sql_stmt, &stmt) < 0) return -1;
+  
   load_users(&state->api, stmt);
 
   free(sql_stmt);
@@ -228,22 +192,17 @@ int worker_handle_users(struct worker_state *state, const struct api_msg *msg)
 
 int worker_handle_login(struct worker_state *state, const struct api_msg *msg)
 {
-  if (state->curruser)
-  {
-    reply_msg(&state->api, 40, "error: command not currently available", R_LOGIN);
-    return 0;
-  }
+  if(logged(&state->api, state->curruser)) return 0;
 
-  char *buf = (char *)malloc(msg->msg_size);
-  memcpy(buf, msg->msg, msg->msg_size);
-  char *username = strtok(buf, " ");
-  char *password = strtok(NULL, " ");
+  char *buf, *username, *password;
+  split_msg(msg->msg, msg->msg_size, &buf, &username, &password);
+
   char *sql_stmt = (char *)malloc((48 + 8) * sizeof(char));
   sprintf(sql_stmt, "SELECT password FROM Users WHERE username=\'%s\'", username);
   sqlite3_stmt *stmt;
-  if (prepare_db(state->db, sql_stmt, &stmt) < 0)
+  if (prepare_db(state->db, sql_stmt, &stmt) < 0) 
   {
-    free(sql_stmt);
+    free(buf);
     return -1;
   }
 
@@ -261,7 +220,6 @@ int worker_handle_login(struct worker_state *state, const struct api_msg *msg)
       sprintf(sql_stmt, "UPDATE Users SET status=1 WHERE username=\'%s\'", username); // update database to show user as logged in
       if (exec_query(state->db, sql_stmt) < 0)
       {
-        free(sql_stmt);
         free(buf);
         return -1;
       }
@@ -306,7 +264,7 @@ static int execute_request(struct worker_state *state, const struct api_msg *msg
   }
   case C_LOGIN:
   {
-    worker_handle_login(state, msg);
+    return worker_handle_login(state, msg);
   }
   default:
     return -1;
@@ -332,6 +290,7 @@ static int execute_request(struct worker_state *state, const struct api_msg *msg
       if (state->curruser)
       {
         log_out(state->db, state->curruser);
+        state->curruser = NULL;
       }
       state->eof = 1;
       return 0;
