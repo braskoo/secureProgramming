@@ -46,30 +46,10 @@ void ui_state_fill(char *line, struct ui_state *state){
   state->msg_size = (msg - 1) ? strlen(msg) + 1 : 0;
 }
 
-//counts the number of args of a command
-int arg_count(char *line){
-    int i = 0;
-    int arg;
-    if(line[0]==' ' || line[0]=='\t'){
-      arg = 0;
-    } else {
-      arg = 1;
-    }
-    
-    char prevchar = 'a';
-    while(line[i]!='\0'){
-      if((line[i]==' ' || line[i]=='\t') && prevchar!=' ' && prevchar!='\t'){
-          arg++;
-      }
-      prevchar = line[i];
-      i++;
-    }
-    return arg;
-}
-
 // parses command
 enum COMMANDS ui_command_parse(struct ui_state *state){
   enum COMMANDS command;
+  char** str_arr = NULL;
 
   // parse command type
   if(!state->command){ 
@@ -81,12 +61,20 @@ enum COMMANDS ui_command_parse(struct ui_state *state){
     else command = C_EXIT;
   }
   else if(strcmp(state->command, "/register") == 0){
-    if(arg_count(state->msg) == 2) command = C_REGISTER;
+    int argc = to_str_arr(state->msg, state->msg_size, &str_arr);
+    if(argc == 2) {
+      command = C_REGISTER;
+      state->msg_size = sprintf(state->msg, "%s %s", str_arr[0], str_arr[1]) + 1;
+    }
     else command = C_INVALID;
   }
   else if(strcmp(state->command, "/login") == 0){
-    printf("%d\n",arg_count(state->msg));
-    if(arg_count(state->msg) == 2) command = C_LOGIN;
+    int argc = to_str_arr(state->msg, state->msg_size, &str_arr);
+    printf("%d\n",argc);
+    if(argc == 2) {
+      command = C_LOGIN;
+      state->msg_size = sprintf(state->msg, "%s %s", str_arr[0], str_arr[1]) + 1;
+    }
     else command = C_INVALID;
   }
   else if(strcmp(state->command, "/users") == 0){
@@ -94,6 +82,8 @@ enum COMMANDS ui_command_parse(struct ui_state *state){
     else command = C_USERS;
   }
   else command = C_UNKNOWN;
+
+  free(str_arr);
 
   return command;
 }

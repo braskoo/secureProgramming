@@ -17,7 +17,7 @@ void api_debug_msg(const struct api_msg *msg, const char* str){
     code = msg->code.reply;
   }
 
-  printf("%s, api msg: %x|%li|%s\n", str, code, msg->msg_size, msg->msg);
+  printf("%s, api msg: %x|%li|%s\n", str, code, msg->msg_size, msg->msg_size > 0 ? msg->msg : "");
 }
 
 /**
@@ -32,10 +32,7 @@ struct api_msg *api_recv(struct api_state *state){
 
   int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
-  //api_debug_msg(msg, "RECV");
-
   if(recieved <= 0){
-    printf("socket error");
     msg->code.command = recieved;
     msg = realloc(msg, sizeof(struct api_msg));
     msg->msg_size = 0;
@@ -43,6 +40,8 @@ struct api_msg *api_recv(struct api_state *state){
     msg = realloc(msg, recieved);
     msg->msg_size = recieved - sizeof(struct api_msg);
   }
+  
+  api_debug_msg(msg, "RECV");
 
   return msg;
 }
@@ -91,7 +90,7 @@ void api_state_init(struct api_state *state, int fd) {
 }
 
 ssize_t api_send(struct api_state *api, const struct api_msg *request){
-  // api_debug_msg(request, "SEND");
+  api_debug_msg(request, "SEND");
 
   ssize_t sent = send(api->fd, request, request->msg_size + sizeof(struct api_msg), MSG_DONTWAIT);
 

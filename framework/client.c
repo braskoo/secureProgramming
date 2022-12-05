@@ -59,7 +59,7 @@ static int client_process_command(struct client_state *state) {
     return -1;
   }
 
-  // replace \n by \0
+  // null terminate string
   line[strlen(line) - 1] = '\0'; 
   handlespace(line);
   // fill ui state with appropriate information from line and validate input
@@ -68,10 +68,10 @@ static int client_process_command(struct client_state *state) {
   enum COMMANDS command = ui_command_parse(&state->ui);
   union CODE code = {command};
 
-  // if(command == C_EXIT){
-  //   free(line);
-  //   return -1;
-  // }
+  if(command == C_EXIT){
+    ret = -1;
+    goto cleanup;
+  }
 
   if(command == C_INVALID){
     printf("error: invalid command format\n");

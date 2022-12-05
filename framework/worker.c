@@ -22,13 +22,6 @@ struct worker_state {
   /* TODO worker state variables go here */
 };
 
-void send_ack(struct api_state state){
-  union CODE code = {R_ACK};
-  struct api_msg *msg = api_msg_compose(code, sizeof("ACK"), "ACK");
-
-  api_send(&state, msg);
-}
-
 /**
  * @brief Reads an incoming notification from the server and notifies
  *        the client.
@@ -178,7 +171,7 @@ static int execute_request(
     }
     case C_REGISTER: {
       if(state->curruser){
-        reply_msg(&state->api, 40, "error: command not currently available", R_REGISTER);
+        reply_msg(&state->api, 39, "error: command not currently available", R_REGISTER);
         break;
       }
       // struct string_pair buf;
@@ -306,8 +299,9 @@ static int handle_client_request(struct worker_state *state) {
   struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
   r = msg->code.command;
-  if (r < 0) return -1;
-  if (r == 0) {
+  if (r == R_SOCKERR) return -1;
+  if (r == R_SOCKCLOSED) {
+    //TODO mark user as offline
     state->eof = 1;
     return 0;
   }
