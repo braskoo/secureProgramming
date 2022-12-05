@@ -14,6 +14,8 @@ int prepare_db(sqlite3 *db, char *sql_stmt, sqlite3_stmt **ppStmt)
     {
         printf("error: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
+        sqlite3_finalize(*ppStmt);
+        free(sql_stmt);
         return -1;
     }
     return 0;
@@ -87,6 +89,7 @@ int exec_query(sqlite3 *db, char *sql_stmt)
         printf("error: %s\n", sqlite3_errmsg(db));
         sqlite3_free(err_msg);
         sqlite3_close(db);
+        free(sql_stmt);
         return -1;
     }
     return 0;
@@ -149,7 +152,6 @@ char *check_users(struct api_state *api, sqlite3_stmt *stmt)
         length = sqlite3_column_bytes(stmt, 0) + 1;
         message = realloc(message, length);
         memccpy(message, sqlite3_column_text(stmt, 0), '\0', length);
-        printf("message: %s\n", message);
     }
     return message;
 }

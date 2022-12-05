@@ -15,3 +15,19 @@ void reply_msg(struct api_state *api, int msg_size, char *msg, enum REPLIES repl
     free(reply);
 }
 
+void split_msg(const char *msg, ssize_t size, char **buf, char **username, char **password)
+{
+    *buf = (char *)malloc(size);
+    memcpy(*buf, msg, size);
+    *username = strtok(*buf, " ");
+    *password = strtok(NULL, " ");
+}
+
+int logged(struct api_state *api, char *user){
+    if (!user)
+    {
+        reply_msg(api, 40, "error: command not currently available", R_INVALID);
+        return 0;
+    }
+    return 1;
+}
