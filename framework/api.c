@@ -8,16 +8,20 @@
 
 #include "api.h"
 
-void api_debug_msg(const struct api_msg *msg, const char* str){
+void api_debug_msg(const struct api_msg *msg, const char *str)
+{
   int code = 0;
 
-  if(strncmp(str, "RECV", sizeof("RECV"))){
+  if (strncmp(str, "RECV", sizeof("RECV")))
+  {
     code = msg->code.command;
-  } else {
+  }
+  else
+  {
     code = msg->code.reply;
   }
 
-  printf("%s, api msg: %x|%li|%s\n", str, code, msg->msg_size, msg->msg);
+  printf("%s, api msg: %x|%li|%s\n", str, code, msg->msg_size, msg->msg_size > 0 ? msg->msg : "");
 }
 
 /**
@@ -25,30 +29,34 @@ void api_debug_msg(const struct api_msg *msg, const char* str){
  * @param state   Initialized API state
  * @return        Returns pointer to newly allocated api_msg block. command contains the return value of recv
  */
-struct api_msg *api_recv(struct api_state *state){
+struct api_msg *api_recv(struct api_state *state)
+{
   assert(state);
 
   struct api_msg *msg = malloc(MSG_LEN_MAX);
 
   int recieved = recv(state->fd, msg, MSG_LEN_MAX, 0);
 
-  //api_debug_msg(msg, "RECV");
-
-  if(recieved <= 0){
-    printf("socket error");
+  if (recieved <= 0)
+  {
     msg->code.command = recieved;
     msg = realloc(msg, sizeof(struct api_msg));
     msg->msg_size = 0;
-  } else {
+  }
+  else
+  {
     msg = realloc(msg, recieved);
     msg->msg_size = recieved - sizeof(struct api_msg);
   }
+
+  api_debug_msg(msg, "RECV");
 
   return msg;
 }
 
 // size has to include null terminator
-struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text){
+struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text)
+{
   assert(text);
 
   struct api_msg *msg = malloc(size + sizeof(struct api_msg));
@@ -64,7 +72,8 @@ struct api_msg *api_msg_compose(union CODE code, ssize_t size, const char *text)
  * @brief         Frees api_state context
  * @param state   Initialized API state to be cleaned up
  */
-void api_state_free(struct api_state *state) {
+void api_state_free(struct api_state *state)
+{
 
   assert(state);
 
@@ -76,7 +85,8 @@ void api_state_free(struct api_state *state) {
  * @param state   API state to be initialized
  * @param fd      File descriptor of connection socket
  */
-void api_state_init(struct api_state *state, int fd) {
+void api_state_init(struct api_state *state, int fd)
+{
 
   assert(state);
 
@@ -87,11 +97,11 @@ void api_state_init(struct api_state *state, int fd) {
   state->fd = fd;
 
   /* TODO initialize API state */
-
 }
 
-ssize_t api_send(struct api_state *api, const struct api_msg *request){
-  // api_debug_msg(request, "SEND");
+ssize_t api_send(struct api_state *api, const struct api_msg *request)
+{
+  api_debug_msg(request, "SEND");
 
   ssize_t sent = send(api->fd, request, request->msg_size + sizeof(struct api_msg), MSG_DONTWAIT);
 

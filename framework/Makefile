@@ -20,7 +20,7 @@ server.o: server.c util.h
 
 util.o: util.c util.h
 
-workerutil.o: workerutil.c workerutil.h
+workerutil.o: workerutil.h workerutil.c
 
 worker.o: worker.c util.h worker.h db.o
 

@@ -15,7 +15,8 @@
  *        connection fd. Fails with -1.
  */
 static int client_connect(struct client_state *state,
-  const char *hostname, uint16_t port) {
+                          const char *hostname, uint16_t port)
+{
   int fd;
   struct sockaddr_in addr;
 
@@ -23,19 +24,22 @@ static int client_connect(struct client_state *state,
   assert(hostname);
 
   /* look up hostname */
-  if (lookup_host_ipv4(hostname, &addr.sin_addr) != 0) return -1;
+  if (lookup_host_ipv4(hostname, &addr.sin_addr) != 0)
+    return -1;
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
 
   /* create TCP socket */
   fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0) {
+  if (fd < 0)
+  {
     perror("error: cannot allocate server socket");
     return -1;
   }
 
   /* connect to server */
-  if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+  if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+  {
     perror("error: cannot connect to server");
     close(fd);
     return -1;
@@ -44,7 +48,8 @@ static int client_connect(struct client_state *state,
   return fd;
 }
 
-static int client_process_command(struct client_state *state) {
+static int client_process_command(struct client_state *state)
+{
   assert(state);
 
   int ret;
@@ -53,14 +58,15 @@ static int client_process_command(struct client_state *state) {
   char *line = NULL;
   size_t len = 0;
 
-  if (getline(&line, &len, stdin) == -1){
+  if (getline(&line, &len, stdin) == -1)
+  {
     state->eof = 1;
     free(line);
     return -1;
   }
 
-  // replace \n by \0
-  line[strlen(line) - 1] = '\0'; 
+  // null terminate string
+  line[strlen(line) - 1] = '\0';
   handlespace(line);
   // fill ui state with appropriate information from line and validate input
   ui_state_fill(line, &state->ui);
@@ -68,18 +74,21 @@ static int client_process_command(struct client_state *state) {
   enum COMMANDS command = ui_command_parse(&state->ui);
   union CODE code = {command};
 
-  // if(command == C_EXIT){
-  //   free(line);
-  //   return -1;
-  // }
+  if (command == C_EXIT)
+  {
+    ret = -1;
+    goto cleanup;
+  }
 
-  if(command == C_INVALID){
+  if (command == C_INVALID)
+  {
     printf("error: invalid command format\n");
     ret = 0;
     goto cleanup;
   }
 
-  if(command == C_UNKNOWN){
+  if (command == C_UNKNOWN)
+  {
     printf("error: unknown command %s\n", state->ui.command);
     ret = 0;
     goto cleanup;
@@ -87,8 +96,9 @@ static int client_process_command(struct client_state *state) {
 
   struct api_msg *request = api_msg_compose(code, state->ui.msg_size, state->ui.msg);
   ssize_t sent = api_send(&state->api, request);
-  
-  if(sent == -1){
+
+  if (sent == -1)
+  {
     perror("socket closed");
     printf("hihi ur socket sucks\n");
     ret = -1;
@@ -97,7 +107,7 @@ static int client_process_command(struct client_state *state) {
   ret = 0;
   free(request);
 
-  cleanup:
+cleanup:
   free(line);
   return ret;
 }
@@ -107,7 +117,8 @@ static int client_process_command(struct client_state *state) {
  * @param state   Initialized client state
  * @param msg     Message to handle
  */
-static int execute_request(struct client_state *state, const struct api_msg *msg) {
+static int execute_request(struct client_state *state, const struct api_msg *msg)
+{
   printf("%s\n", msg->msg);
 
   return 0;
@@ -117,7 +128,8 @@ static int execute_request(struct client_state *state, const struct api_msg *msg
  * @brief         Reads an incoming request from the server and handles it.
  * @param state   Initialized client state
  */
-static int handle_server_request(struct client_state *state) {
+static int handle_server_request(struct client_state *state)
+{
   int r, success = 1;
 
   assert(state);
@@ -125,14 +137,17 @@ static int handle_server_request(struct client_state *state) {
   struct api_msg *msg = api_recv(&state->api);
   /* wait for incoming request, set eof if there are no more requests */
   r = msg->code.command;
-  if (r < 0) return -1;
-  if (r == 0) {
+  if (r < 0)
+    return -1;
+  if (r == 0)
+  {
     state->eof = 1;
     return 0;
   }
 
   /* execute request */
-  if (execute_request(state, msg) != 0) {
+  if (execute_request(state, msg) != 0)
+  {
     success = 0;
   }
 
@@ -148,7 +163,8 @@ static int handle_server_request(struct client_state *state) {
  *        successfully and -1 otherwise.
  *
  */
-static int handle_incoming(struct client_state *state) {
+static int handle_incoming(struct client_state *state)
+{
   int fdmax, r;
   fd_set readfds;
 
@@ -165,28 +181,32 @@ static int handle_incoming(struct client_state *state) {
   fdmax = state->api.fd;
 
   /* wait for at least one to become ready */
-  r = select(fdmax+1, &readfds, NULL, NULL, NULL);
-  if (r < 0) {
-    if (errno == EINTR) return 0;
+  r = select(fdmax + 1, &readfds, NULL, NULL, NULL);
+  if (r < 0)
+  {
+    if (errno == EINTR)
+      return 0;
     perror("error: select failed");
     return -1;
   }
 
   /* handle ready file descriptors */
-  if (FD_ISSET(STDIN_FILENO, &readfds)) {
+  if (FD_ISSET(STDIN_FILENO, &readfds))
+  {
     return client_process_command(state);
-    
   }
   /* TODO once you implement encryption you may need to call ssl_has_data
    * here due to buffering (see ssl-nonblock example)
    */
-  if (FD_ISSET(state->api.fd, &readfds)) {
+  if (FD_ISSET(state->api.fd, &readfds))
+  {
     return handle_server_request(state);
   }
   return 0;
 }
 
-static int client_state_init(struct client_state *state) {
+static int client_state_init(struct client_state *state)
+{
   /* clear state, invalidate file descriptors */
   memset(state, 0, sizeof(*state));
 
@@ -195,11 +215,12 @@ static int client_state_init(struct client_state *state) {
 
   /* TODO any additional client state initialization */
   setvbuf(stdout, NULL, _IONBF, 0);
-  
+
   return 0;
 }
 
-static void client_state_free(struct client_state *state) {
+static void client_state_free(struct client_state *state)
+{
 
   /* TODO any additional client state cleanup */
 
@@ -210,27 +231,32 @@ static void client_state_free(struct client_state *state) {
   ui_state_free(&state->ui);
 }
 
-static void usage(void) {
+static void usage(void)
+{
   printf("usage:\n");
   printf("  client host port\n");
   exit(1);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   int fd;
   uint16_t port;
   struct client_state state;
 
   /* check arguments */
-  if (argc != 3) usage();
-  if (parse_port(argv[2], &port) != 0) usage();
+  if (argc != 3)
+    usage();
+  if (parse_port(argv[2], &port) != 0)
+    usage();
 
   /* preparations */
   client_state_init(&state);
 
   /* connect to server */
   fd = client_connect(&state, argv[1], port);
-  if (fd < 0) return 1;
+  if (fd < 0)
+    return 1;
 
   /* initialize API */
   api_state_init(&state.api, fd);
@@ -238,7 +264,8 @@ int main(int argc, char **argv) {
   /* TODO any additional client initialization */
 
   /* client things */
-  while (!state.eof && handle_incoming(&state) == 0);
+  while (!state.eof && handle_incoming(&state) == 0)
+    ;
 
   /* clean up */
   /* TODO any additional client cleanup */
